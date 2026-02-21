@@ -32,7 +32,7 @@ function buildPlatforms() {
   ];
 
   let y = WORLD.height - 470;
-  for (let i = 0; i < 23; i += 1) {
+  for (let i = 0; i < 27; i += 1) {
     const width = i % 6 === 5 ? 220 : 165;
     let x;
 
