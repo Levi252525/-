@@ -97,6 +97,8 @@ const player = {
   maxSpeed: 6.2,
   jumpStrength: 13.6,
   onGround: false,
+  maxJumps: 2,
+  jumpsRemaining: 2,
   spawnX: playerSpawn.x,
   spawnY: playerSpawn.y,
   hurtCooldown: 0,
@@ -110,29 +112,31 @@ const state = {
   finalTime: 0,
 };
 
-const playerSprite = new Image();
-let playerSpriteLoaded = false;
-const playerSpriteOptions = [
+const platformTexture = new Image();
+let platformTextureLoaded = false;
+let platformTexturePattern = null;
+const platformTextureOptions = [
   "./image-removebg-preview (1).png",
   "./image-removebg-preview.png",
   "./pB2YY8tI.webp",
 ];
 
-function loadPlayerSprite(index) {
-  if (index >= playerSpriteOptions.length) {
+function loadPlatformTexture(index) {
+  if (index >= platformTextureOptions.length) {
     return;
   }
 
-  playerSprite.onload = () => {
-    playerSpriteLoaded = true;
+  platformTexture.onload = () => {
+    platformTextureLoaded = true;
+    platformTexturePattern = ctx.createPattern(platformTexture, "repeat");
   };
-  playerSprite.onerror = () => {
-    loadPlayerSprite(index + 1);
+  platformTexture.onerror = () => {
+    loadPlatformTexture(index + 1);
   };
-  playerSprite.src = encodeURI(playerSpriteOptions[index]);
+  platformTexture.src = encodeURI(platformTextureOptions[index]);
 }
 
-loadPlayerSprite(0);
+loadPlatformTexture(0);
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -157,6 +161,7 @@ function resetPlayerToSpawn() {
   player.vx = 0;
   player.vy = 0;
   player.onGround = false;
+  player.jumpsRemaining = player.maxJumps;
   cameraY = WORLD.height - canvas.height;
 }
 
@@ -231,6 +236,7 @@ function resolveVerticalCollisions(entity, solids) {
       entity.y = solid.y - entity.h;
       entity.vy = 0;
       entity.onGround = true;
+      entity.jumpsRemaining = entity.maxJumps;
     } else if (entity.vy < 0) {
       entity.y = solid.y + solid.h;
       entity.vy = 0;
@@ -272,9 +278,15 @@ function updatePlayer() {
     player.vx = 0;
   }
 
-  if (jumpQueued && player.onGround) {
+  // If the player steps off a platform without jumping, keep only one air jump.
+  if (!player.onGround && player.jumpsRemaining === player.maxJumps) {
+    player.jumpsRemaining = player.maxJumps - 1;
+  }
+
+  if (jumpQueued && player.jumpsRemaining > 0) {
     player.vy = -player.jumpStrength;
     player.onGround = false;
+    player.jumpsRemaining -= 1;
   }
   jumpQueued = false;
 
@@ -396,8 +408,21 @@ function drawWalls() {
 
 function drawPlatforms() {
   for (const platform of platforms) {
-    ctx.fillStyle = "#36734b";
+    ctx.fillStyle = "#2f6542";
     ctx.fillRect(platform.x, platform.y, platform.w, platform.h);
+    if (platformTextureLoaded) {
+      if (!platformTexturePattern) {
+        platformTexturePattern = ctx.createPattern(platformTexture, "repeat");
+      }
+      if (platformTexturePattern) {
+        ctx.save();
+        ctx.globalAlpha = 0.24;
+        ctx.translate(platform.x, platform.y);
+        ctx.fillStyle = platformTexturePattern;
+        ctx.fillRect(0, 0, platform.w, platform.h);
+        ctx.restore();
+      }
+    }
     ctx.fillStyle = "#8dd170";
     ctx.fillRect(platform.x, platform.y, platform.w, 6);
   }
@@ -450,21 +475,14 @@ function drawPlayer() {
     return;
   }
 
-  if (playerSpriteLoaded) {
-    ctx.save();
-    if (player.vx < -0.2) {
-      ctx.translate(player.x + player.w / 2, 0);
-      ctx.scale(-1, 1);
-      ctx.drawImage(playerSprite, -player.w / 2 - 12, player.y - 14, player.w + 24, player.h + 24);
-    } else {
-      ctx.drawImage(playerSprite, player.x - 12, player.y - 14, player.w + 24, player.h + 24);
-    }
-    ctx.restore();
-    return;
-  }
-
-  ctx.fillStyle = "#2b5fcc";
+  ctx.fillStyle = "#2f55c6";
   ctx.fillRect(player.x, player.y, player.w, player.h);
+  ctx.fillStyle = "#89b4ff";
+  ctx.fillRect(player.x + 6, player.y + 6, player.w - 12, player.h - 12);
+
+  ctx.fillStyle = "#173070";
+  ctx.fillRect(player.x + 11, player.y + 15, 6, 6);
+  ctx.fillRect(player.x + player.w - 17, player.y + 15, 6, 6);
 }
 
 function drawTextCenter(y, text, size = 36, color = "#f7f9ff") {
@@ -506,7 +524,7 @@ function drawIntroHint() {
   ctx.fillStyle = `rgba(247, 251, 255, ${alpha})`;
   ctx.font = '600 20px "Segoe UI", sans-serif';
   ctx.textAlign = "center";
-  ctx.fillText("Climb upward and reach the glowing summit gate", canvas.width / 2, 48);
+  ctx.fillText("Climb upward with double jump and reach the summit gate", canvas.width / 2, 48);
 }
 
 function draw() {
