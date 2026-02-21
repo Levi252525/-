@@ -9,7 +9,7 @@ Climb upward by jumping from platform to platform and reach the glowing summit g
 The level includes:
 
 - Side wall barriers on both sides of the tower
-- Spike/lava hazards
+- No spike hazards and a safe floor at the bottom
 - Platform textures loaded from your downloaded image assets (`image-removebg-preview (1).png` first, with fallbacks)
 - Double jump movement (you can jump once more while airborne)
 
