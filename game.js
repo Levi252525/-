@@ -49,34 +49,19 @@ function buildPlatforms() {
   }
 
   list.push({ x: WORLD.width / 2 - 120, y: 176, w: 240, h: 16 });
+  list.push({
+    x: WALL_THICKNESS,
+    y: WORLD.height - 32,
+    w: WORLD.width - WALL_THICKNESS * 2,
+    h: 32,
+  });
   return list;
 }
 
 const platforms = buildPlatforms();
 
 function buildHazards() {
-  const list = [
-    {
-      type: "lava",
-      x: WALL_THICKNESS,
-      y: WORLD.height - 30,
-      w: WORLD.width - WALL_THICKNESS * 2,
-      h: 30,
-    },
-  ];
-
-  for (let i = 4; i < platforms.length - 1; i += 5) {
-    const platform = platforms[i];
-    list.push({
-      type: "spikes",
-      x: platform.x + 14,
-      y: platform.y - 12,
-      w: Math.max(42, platform.w - 28),
-      h: 12,
-    });
-  }
-
-  return list;
+  return [];
 }
 
 const hazards = buildHazards();
