@@ -20,7 +20,7 @@ const keys = {
   right: false,
 };
 
-let jumpQueued = false;
+let jumpRequested = false;
 let cameraY = 0;
 let introHintFrames = 210;
 
@@ -98,7 +98,7 @@ const player = {
   jumpStrength: 13.6,
   onGround: false,
   maxJumps: 2,
-  jumpsRemaining: 2,
+  jumpsUsed: 0,
   spawnX: playerSpawn.x,
   spawnY: playerSpawn.y,
   hurtCooldown: 0,
@@ -116,8 +116,8 @@ const platformTexture = new Image();
 let platformTextureLoaded = false;
 let platformTexturePattern = null;
 const platformTextureOptions = [
-  "./image-removebg-preview (1).png",
   "./image-removebg-preview.png",
+  "./image-removebg-preview (1).png",
   "./pB2YY8tI.webp",
 ];
 
@@ -161,7 +161,7 @@ function resetPlayerToSpawn() {
   player.vx = 0;
   player.vy = 0;
   player.onGround = false;
-  player.jumpsRemaining = player.maxJumps;
+  player.jumpsUsed = 0;
   cameraY = WORLD.height - canvas.height;
 }
 
@@ -172,7 +172,7 @@ function resetGame() {
   state.startTime = performance.now();
   state.finalTime = 0;
   player.hurtCooldown = 0;
-  jumpQueued = false;
+  jumpRequested = false;
   introHintFrames = 210;
   resetPlayerToSpawn();
   updateHud();
@@ -236,7 +236,7 @@ function resolveVerticalCollisions(entity, solids) {
       entity.y = solid.y - entity.h;
       entity.vy = 0;
       entity.onGround = true;
-      entity.jumpsRemaining = entity.maxJumps;
+      entity.jumpsUsed = 0;
     } else if (entity.vy < 0) {
       entity.y = solid.y + solid.h;
       entity.vy = 0;
@@ -278,17 +278,12 @@ function updatePlayer() {
     player.vx = 0;
   }
 
-  // If the player steps off a platform without jumping, keep only one air jump.
-  if (!player.onGround && player.jumpsRemaining === player.maxJumps) {
-    player.jumpsRemaining = player.maxJumps - 1;
-  }
-
-  if (jumpQueued && player.jumpsRemaining > 0) {
+  if (jumpRequested && player.jumpsUsed < player.maxJumps) {
     player.vy = -player.jumpStrength;
     player.onGround = false;
-    player.jumpsRemaining -= 1;
+    player.jumpsUsed += 1;
   }
-  jumpQueued = false;
+  jumpRequested = false;
 
   player.vy = Math.min(player.vy + GRAVITY, MAX_FALL_SPEED);
 
@@ -416,7 +411,7 @@ function drawPlatforms() {
       }
       if (platformTexturePattern) {
         ctx.save();
-        ctx.globalAlpha = 0.24;
+        ctx.globalAlpha = 0.58;
         ctx.translate(platform.x, platform.y);
         ctx.fillStyle = platformTexturePattern;
         ctx.fillRect(0, 0, platform.w, platform.h);
@@ -544,7 +539,7 @@ function draw() {
 }
 
 function keyIsJump(key) {
-  return key === "w" || key === "arrowup" || key === " ";
+  return key === "w" || key === "arrowup" || key === " " || key === "space" || key === "spacebar";
 }
 
 function keyDownHandler(event) {
@@ -560,8 +555,8 @@ function keyDownHandler(event) {
     event.preventDefault();
   }
 
-  if (keyIsJump(key)) {
-    jumpQueued = true;
+  if ((keyIsJump(key) || event.code === "Space") && !event.repeat) {
+    jumpRequested = true;
     event.preventDefault();
   }
 
