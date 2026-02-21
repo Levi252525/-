@@ -4,7 +4,13 @@ A small browser platformer built with plain HTML, CSS, and JavaScript.
 
 ## Objective
 
-Collect all coins, then reach the portal at the far right side of the map.
+Climb upward by jumping from platform to platform and reach the glowing summit gate near the top.
+
+The level includes:
+
+- Side wall barriers on both sides of the tower
+- Spike/lava hazards
+- A player sprite loaded from your downloaded image assets (`image-removebg-preview (1).png` first, with fallbacks)
 
 ## Controls
 
