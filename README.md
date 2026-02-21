@@ -10,12 +10,13 @@ The level includes:
 
 - Side wall barriers on both sides of the tower
 - Spike/lava hazards
-- A player sprite loaded from your downloaded image assets (`image-removebg-preview (1).png` first, with fallbacks)
+- Platform textures loaded from your downloaded image assets (`image-removebg-preview (1).png` first, with fallbacks)
+- Double jump movement (you can jump once more while airborne)
 
 ## Controls
 
 - **A / D** or **Left / Right Arrow**: move
-- **W / Up Arrow / Space**: jump
+- **W / Up Arrow / Space**: jump (double jump enabled)
 - **R**: restart after win/loss
 
 ## Run locally
