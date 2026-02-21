@@ -285,17 +285,15 @@ function updatePlayer() {
   }
 
   if (player.y > WORLD.height + 120) {
-    damagePlayer();
+    player.y = WORLD.height - 32 - player.h;
+    player.vy = 0;
+    player.onGround = true;
+    player.jumpsUsed = 0;
   }
 }
 
 function checkHazards() {
-  for (const hazard of hazards) {
-    if (intersects(player, hazard)) {
-      damagePlayer();
-      return;
-    }
-  }
+  return;
 }
 
 function checkGoal() {
@@ -409,30 +407,7 @@ function drawPlatforms() {
 }
 
 function drawHazards() {
-  for (const hazard of hazards) {
-    if (hazard.type === "lava") {
-      const lava = ctx.createLinearGradient(0, hazard.y, 0, hazard.y + hazard.h);
-      lava.addColorStop(0, "#ffb15a");
-      lava.addColorStop(0.55, "#ff6339");
-      lava.addColorStop(1, "#c72e1f");
-      ctx.fillStyle = lava;
-      ctx.fillRect(hazard.x, hazard.y, hazard.w, hazard.h);
-      continue;
-    }
-
-    const spikeCount = Math.max(3, Math.floor(hazard.w / 20));
-    const spikeWidth = hazard.w / spikeCount;
-    ctx.fillStyle = "#f6f8ff";
-    for (let i = 0; i < spikeCount; i += 1) {
-      const x = hazard.x + i * spikeWidth;
-      ctx.beginPath();
-      ctx.moveTo(x, hazard.y + hazard.h);
-      ctx.lineTo(x + spikeWidth * 0.5, hazard.y);
-      ctx.lineTo(x + spikeWidth, hazard.y + hazard.h);
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
+  return;
 }
 
 function drawGoal() {
