@@ -1,9 +1,7 @@
 const canvas = document.getElementById("game-canvas");
 const ctx = canvas.getContext("2d");
 
-const hudLives = document.getElementById("hud-lives");
-const hudHeight = document.getElementById("hud-height");
-const hudTime = document.getElementById("hud-time");
+const hudStatus = document.getElementById("hud-status");
 
 const WORLD = {
   width: 960,
@@ -11,9 +9,11 @@ const WORLD = {
 };
 
 const WALL_THICKNESS = 30;
-const GRAVITY = 0.6;
+const GRAVITY = 0.68;
 const MAX_FALL_SPEED = 15;
 const CAMERA_FOLLOW_Y = 0.62;
+const PLAYER_WIDTH = 30;
+const PLAYER_HEIGHT = 52;
 
 const keys = {
   left: false,
@@ -68,15 +68,15 @@ const hazards = buildHazards();
 const goal = { x: WORLD.width / 2 - 30, y: 68, w: 60, h: 88 };
 
 const playerSpawn = {
-  x: platforms[0].x + platforms[0].w / 2 - 28,
+  x: platforms[0].x + platforms[0].w / 2 - PLAYER_WIDTH / 2,
   y: platforms[0].y - 50,
 };
 
 const player = {
   x: playerSpawn.x,
   y: playerSpawn.y,
-  w: 56,
-  h: 46,
+  w: PLAYER_WIDTH,
+  h: PLAYER_HEIGHT,
   vx: 0,
   vy: 0,
   maxSpeed: 6.2,
@@ -86,15 +86,10 @@ const player = {
   jumpsUsed: 0,
   spawnX: playerSpawn.x,
   spawnY: playerSpawn.y,
-  hurtCooldown: 0,
 };
 
 const state = {
   mode: "playing",
-  lives: 3,
-  highestClimb: 0,
-  startTime: performance.now(),
-  finalTime: 0,
 };
 
 const platformTexture = new Image();
@@ -136,10 +131,6 @@ function intersects(a, b) {
   );
 }
 
-function currentClimb() {
-  return Math.max(0, Math.floor(player.spawnY - player.y));
-}
-
 function resetPlayerToSpawn() {
   player.x = player.spawnX;
   player.y = player.spawnY;
@@ -152,45 +143,10 @@ function resetPlayerToSpawn() {
 
 function resetGame() {
   state.mode = "playing";
-  state.lives = 3;
-  state.highestClimb = 0;
-  state.startTime = performance.now();
-  state.finalTime = 0;
-  player.hurtCooldown = 0;
   jumpRequested = false;
   introHintFrames = 210;
   resetPlayerToSpawn();
-  updateHud();
-}
-
-function updateHud() {
-  const seconds =
-    state.mode === "playing"
-      ? (performance.now() - state.startTime) / 1000
-      : state.finalTime;
-
-  state.highestClimb = Math.max(state.highestClimb, currentClimb());
-  hudLives.textContent = `Lives: ${state.lives}`;
-  hudHeight.textContent = `Climb: ${state.highestClimb}px`;
-  hudTime.textContent = `Time: ${seconds.toFixed(1)}s`;
-}
-
-function damagePlayer() {
-  if (player.hurtCooldown > 0 || state.mode !== "playing") {
-    return;
-  }
-
-  state.lives -= 1;
-  player.hurtCooldown = 95;
-
-  if (state.lives <= 0) {
-    state.mode = "game-over";
-    state.finalTime = (performance.now() - state.startTime) / 1000;
-  } else {
-    resetPlayerToSpawn();
-  }
-
-  updateHud();
+  hudStatus.textContent = "No score / no checkpoints";
 }
 
 function resolveHorizontalCollisions(entity, solids) {
@@ -302,8 +258,6 @@ function checkGoal() {
   }
 
   state.mode = "won";
-  state.finalTime = (performance.now() - state.startTime) / 1000;
-  updateHud();
 }
 
 function updateCamera() {
@@ -313,13 +267,9 @@ function updateCamera() {
 
 function update() {
   if (state.mode !== "playing") {
-    if (player.hurtCooldown > 0) {
-      player.hurtCooldown -= 1;
-    }
     if (introHintFrames > 0) {
       introHintFrames -= 1;
     }
-    updateHud();
     return;
   }
 
@@ -328,15 +278,9 @@ function update() {
   checkGoal();
   updateCamera();
 
-  if (player.hurtCooldown > 0) {
-    player.hurtCooldown -= 1;
-  }
-
   if (introHintFrames > 0) {
     introHintFrames -= 1;
   }
-
-  updateHud();
 }
 
 function drawBackground() {
@@ -426,10 +370,6 @@ function drawGoal() {
 }
 
 function drawPlayer() {
-  if (player.hurtCooldown > 0 && Math.floor(player.hurtCooldown / 4) % 2 === 0) {
-    return;
-  }
-
   ctx.fillStyle = "#2f55c6";
   ctx.fillRect(player.x, player.y, player.w, player.h);
   ctx.fillStyle = "#89b4ff";
@@ -457,15 +397,12 @@ function drawOverlay() {
 
   if (state.mode === "won") {
     drawTextCenter(220, "Summit Reached!", 54, "#bafce2");
-    drawTextCenter(275, `Final Time: ${state.finalTime.toFixed(1)}s`, 30, "#eef7ff");
-    drawTextCenter(324, `Best Climb: ${state.highestClimb}px`, 24, "#d9deff");
-    drawTextCenter(366, "Press R to play again", 24, "#d9deff");
+    drawTextCenter(292, "Press R to play again", 24, "#d9deff");
     return;
   }
 
-  drawTextCenter(220, "Game Over", 56, "#ffb7b7");
-  drawTextCenter(275, `Best Climb: ${state.highestClimb}px`, 30, "#eef7ff");
-  drawTextCenter(330, "Press R to retry", 24, "#d9deff");
+  drawTextCenter(220, "Paused", 52, "#eef7ff");
+  drawTextCenter(292, "Press R to play", 24, "#d9deff");
 }
 
 function drawIntroHint() {
