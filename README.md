@@ -14,7 +14,7 @@ The level includes:
 - Double jump movement (you can jump once more while airborne)
 - No score counter and no checkpoint system
 - A skinnier player character with slightly higher gravity
-- 20 AI bots that jump around and try to follow your character, each with unique size and color
+- 20 AI bots that use platforms to follow your character, each with unique size and color
 
 ## Controls
 
@@ -25,6 +25,10 @@ The level includes:
 ## Run locally
 
 Open `index.html` in a browser.
+
+For Chromebook/offline use, open the single-file build directly:
+
+- `game.html` (no local server required)
 
 If you prefer serving it from a local web server:
 
