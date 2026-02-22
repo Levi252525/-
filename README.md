@@ -12,6 +12,8 @@ The level includes:
 - No spike hazards and a safe floor at the bottom
 - Platform textures loaded from your downloaded image assets (`image-removebg-preview (1).png` first, with fallbacks)
 - Double jump movement (you can jump once more while airborne)
+- No score counter and no checkpoint system
+- A skinnier player character with slightly higher gravity
 
 ## Controls
 
