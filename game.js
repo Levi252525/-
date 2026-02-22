@@ -91,22 +91,31 @@ const player = {
 
 function createBot(index) {
   const laneWidth = WORLD.width - WALL_THICKNESS * 2 - 80;
+  const width = 12 + (index % 5) * 2;
+  const height = 34 + ((index * 7) % 6) * 5;
+  const spawnFloorY = playerSpawn.y + PLAYER_HEIGHT;
+  const tintHue = (index * 31 + 40) % 360;
+  const tintSat = 58 + (index % 4) * 10;
+  const tintLight = 42 + ((index * 5) % 4) * 8;
   return {
     x: WALL_THICKNESS + 40 + ((index * 47) % laneWidth),
-    y: playerSpawn.y - (index % 5) * 14,
-    w: 18,
-    h: 48,
+    y: spawnFloorY - height - (index % 5) * 10,
+    w: width,
+    h: height,
     vx: 0,
     vy: 0,
     onGround: false,
     maxJumps: 2,
     jumpsUsed: 0,
-    maxSpeed: 4.2,
-    jumpStrength: 11.8,
+    maxSpeed: 5.3 - width * 0.065,
+    jumpStrength: 11.2 + (height - 34) * 0.06,
     jumpCooldown: 8 + (index % 9),
     roamDir: index % 2 === 0 ? 1 : -1,
     roamTimer: 25 + ((index * 17) % 65),
-    tintHue: (index * 31) % 360,
+    tintHue,
+    tintSat,
+    tintLight,
+    tintAccentLight: Math.min(90, tintLight + 20),
   };
 }
 
@@ -480,15 +489,23 @@ function drawGoal() {
 
 function drawBots() {
   for (const bot of bots) {
-    ctx.fillStyle = `hsl(${bot.tintHue}, 72%, 56%)`;
+    ctx.fillStyle = `hsl(${bot.tintHue}, ${bot.tintSat}%, ${bot.tintLight}%)`;
     ctx.fillRect(bot.x, bot.y, bot.w, bot.h);
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
-    ctx.fillRect(bot.x + 3, bot.y + 6, bot.w - 6, bot.h - 12);
+    const insetX = Math.max(2, Math.floor(bot.w * 0.17));
+    const insetY = Math.max(4, Math.floor(bot.h * 0.15));
+    const insetW = Math.max(2, bot.w - insetX * 2);
+    const insetH = Math.max(4, bot.h - insetY * 2);
+    ctx.fillStyle = `hsl(${bot.tintHue}, ${Math.max(22, bot.tintSat - 22)}%, ${bot.tintAccentLight}%)`;
+    ctx.fillRect(bot.x + insetX, bot.y + insetY, insetW, insetH);
 
     ctx.fillStyle = "#152447";
-    ctx.fillRect(bot.x + 4, bot.y + 14, 3, 3);
-    ctx.fillRect(bot.x + bot.w - 7, bot.y + 14, 3, 3);
+    const eyeSize = Math.max(2, Math.floor(bot.w * 0.16));
+    const eyeY = bot.y + Math.max(8, Math.floor(bot.h * 0.28));
+    const leftEyeX = bot.x + Math.max(2, Math.floor(bot.w * 0.24));
+    const rightEyeX = bot.x + bot.w - Math.max(2, Math.floor(bot.w * 0.24)) - eyeSize;
+    ctx.fillRect(leftEyeX, eyeY, eyeSize, eyeSize);
+    ctx.fillRect(rightEyeX, eyeY, eyeSize, eyeSize);
   }
 }
 
