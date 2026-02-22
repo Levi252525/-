@@ -26,6 +26,10 @@ The level includes:
 
 Open `index.html` in a browser.
 
+For Chromebook/offline use, open the single-file build directly:
+
+- `game.html` (no local server required)
+
 If you prefer serving it from a local web server:
 
 ```bash
