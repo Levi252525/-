@@ -14,7 +14,7 @@ const MAX_FALL_SPEED = 15;
 const CAMERA_FOLLOW_Y = 0.62;
 const PLAYER_WIDTH = 30;
 const PLAYER_HEIGHT = 52;
-const BOT_COUNT = 20;
+const BOT_COUNT = 3;
 
 const keys = {
   left: false,
@@ -110,10 +110,10 @@ function createBot(index) {
     onGround: false,
     maxJumps: 3,
     jumpsUsed: 0,
-    maxSpeed: 5.3 - width * 0.065,
+    maxSpeed: 5.7 - width * 0.045,
     jumpStrength: 11.2 + (height - 34) * 0.06,
     jumpCooldown: 0,
-    copyJumpLag: index % 3,
+    copyJumpLag: index % 2,
     copyJumpTimer: 0,
     queuedJumpId: 0,
     lastCopiedJumpId: 0,
@@ -198,7 +198,7 @@ function resetGame() {
   playerJumpSignalVy = 0;
   resetPlayerToSpawn();
   resetBots();
-  hudStatus.textContent = "No score / no checkpoints - 20 mimic bots";
+  hudStatus.textContent = "No score / no checkpoints - 3 chasing mimic bots";
 }
 
 function resolveHorizontalCollisions(entity, solids) {
@@ -324,6 +324,14 @@ function chooseBotTargetPlatform(bot) {
       continue;
     }
 
+    if (playerAbove && platform.y > player.y + 180) {
+      continue;
+    }
+
+    if (!playerAbove && platform.y < player.y - 260) {
+      continue;
+    }
+
     const verticalGap = Math.abs(platform.y - bot.y);
     if (verticalGap > 230) {
       continue;
@@ -335,10 +343,15 @@ function chooseBotTargetPlatform(bot) {
       continue;
     }
 
+    const verticalToPlayer = Math.abs(platform.y - player.y);
+    const nearPlayerHeight = verticalToPlayer < 90;
+
     const score =
-      distanceToAim * 0.8 +
-      Math.abs(aimX - playerCenterX) * 0.45 +
-      verticalGap * (playerAbove ? 0.7 : 0.2);
+      distanceToAim * 0.55 +
+      Math.abs(aimX - playerCenterX) * 0.35 +
+      verticalGap * (playerAbove ? 0.5 : 0.28) +
+      verticalToPlayer * 0.65 +
+      (nearPlayerHeight ? -38 : 0);
 
     if (score < bestScore) {
       bestScore = score;
@@ -350,8 +363,8 @@ function chooseBotTargetPlatform(bot) {
 }
 
 function updateSingleBot(bot) {
-  const acceleration = 0.46;
-  const friction = 0.84;
+  const acceleration = 0.58;
+  const friction = 0.9;
   const playerCenterX = getEntityCenterX(player);
   const botCenterX = getEntityCenterX(bot);
   const target = chooseBotTargetPlatform(bot);
@@ -368,7 +381,9 @@ function updateSingleBot(bot) {
     bot.vx *= friction;
   }
 
-  bot.vx = clamp(bot.vx, -bot.maxSpeed, bot.maxSpeed);
+  const chaseDistanceX = Math.abs(targetX - botCenterX);
+  const dynamicMaxSpeed = bot.maxSpeed + (chaseDistanceX > 140 ? 1.4 : 0.4);
+  bot.vx = clamp(bot.vx, -dynamicMaxSpeed, dynamicMaxSpeed);
   if (Math.abs(bot.vx) < 0.03) {
     bot.vx = 0;
   }
