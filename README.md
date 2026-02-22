@@ -14,7 +14,7 @@ The level includes:
 - Double jump movement (you can jump once more while airborne)
 - No score counter and no checkpoint system
 - A skinnier player character with slightly higher gravity
-- 20 AI bots that use platforms to follow your character, each with unique size/color and triple jump
+- 20 AI bots that follow your movement and copy your jumps, with unique size/color and triple jump
 
 ## Controls
 
