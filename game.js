@@ -14,6 +14,7 @@ const MAX_FALL_SPEED = 15;
 const CAMERA_FOLLOW_Y = 0.62;
 const PLAYER_WIDTH = 30;
 const PLAYER_HEIGHT = 52;
+const BOT_COUNT = 20;
 
 const keys = {
   left: false,
@@ -88,6 +89,29 @@ const player = {
   spawnY: playerSpawn.y,
 };
 
+function createBot(index) {
+  const laneWidth = WORLD.width - WALL_THICKNESS * 2 - 80;
+  return {
+    x: WALL_THICKNESS + 40 + ((index * 47) % laneWidth),
+    y: playerSpawn.y - (index % 5) * 14,
+    w: 18,
+    h: 48,
+    vx: 0,
+    vy: 0,
+    onGround: false,
+    maxJumps: 2,
+    jumpsUsed: 0,
+    maxSpeed: 4.2,
+    jumpStrength: 11.8,
+    jumpCooldown: 8 + (index % 9),
+    roamDir: index % 2 === 0 ? 1 : -1,
+    roamTimer: 25 + ((index * 17) % 65),
+    tintHue: (index * 31) % 360,
+  };
+}
+
+const bots = Array.from({ length: BOT_COUNT }, (_, index) => createBot(index));
+
 const state = {
   mode: "playing",
 };
@@ -141,12 +165,19 @@ function resetPlayerToSpawn() {
   cameraY = WORLD.height - canvas.height;
 }
 
+function resetBots() {
+  for (let i = 0; i < bots.length; i += 1) {
+    Object.assign(bots[i], createBot(i));
+  }
+}
+
 function resetGame() {
   state.mode = "playing";
   jumpRequested = false;
   introHintFrames = 210;
   resetPlayerToSpawn();
-  hudStatus.textContent = "No score / no checkpoints";
+  resetBots();
+  hudStatus.textContent = "No score / no checkpoints - 20 bots active";
 }
 
 function resolveHorizontalCollisions(entity, solids) {
@@ -185,16 +216,16 @@ function resolveVerticalCollisions(entity, solids) {
   }
 }
 
-function keepInsideWalls() {
+function keepInsideWalls(entity) {
   const leftLimit = WALL_THICKNESS;
-  const rightLimit = WORLD.width - WALL_THICKNESS - player.w;
+  const rightLimit = WORLD.width - WALL_THICKNESS - entity.w;
 
-  if (player.x < leftLimit) {
-    player.x = leftLimit;
-    player.vx = 0;
-  } else if (player.x > rightLimit) {
-    player.x = rightLimit;
-    player.vx = 0;
+  if (entity.x < leftLimit) {
+    entity.x = leftLimit;
+    entity.vx = 0;
+  } else if (entity.x > rightLimit) {
+    entity.x = rightLimit;
+    entity.vx = 0;
   }
 }
 
@@ -230,7 +261,7 @@ function updatePlayer() {
 
   player.x += player.vx;
   resolveHorizontalCollisions(player, platforms);
-  keepInsideWalls();
+  keepInsideWalls(player);
 
   player.y += player.vy;
   resolveVerticalCollisions(player, platforms);
@@ -245,6 +276,83 @@ function updatePlayer() {
     player.vy = 0;
     player.onGround = true;
     player.jumpsUsed = 0;
+  }
+}
+
+function updateSingleBot(bot) {
+  const acceleration = 0.46;
+  const friction = 0.84;
+  const toPlayerX = player.x + player.w * 0.5 - (bot.x + bot.w * 0.5);
+  const toPlayerY = player.y - bot.y;
+
+  bot.roamTimer -= 1;
+  if (bot.roamTimer <= 0) {
+    bot.roamDir = Math.random() < 0.5 ? -1 : 1;
+    bot.roamTimer = 26 + Math.floor(Math.random() * 70);
+  }
+
+  let intentX = Math.sign(toPlayerX);
+  if (Math.abs(toPlayerX) < 30) {
+    intentX = bot.roamDir;
+  } else if (Math.abs(toPlayerX) < 10) {
+    intentX = 0;
+  }
+
+  if (intentX !== 0) {
+    bot.vx += intentX * acceleration;
+  } else {
+    bot.vx *= friction;
+  }
+
+  bot.vx = clamp(bot.vx, -bot.maxSpeed, bot.maxSpeed);
+  if (Math.abs(bot.vx) < 0.03) {
+    bot.vx = 0;
+  }
+
+  if (bot.jumpCooldown > 0) {
+    bot.jumpCooldown -= 1;
+  }
+
+  const playerAbove = toPlayerY < -44;
+  const stuckOnGround = bot.onGround && Math.abs(bot.vx) < 0.12 && Math.abs(toPlayerX) > 36;
+  const randomHop = bot.onGround && Math.random() < 0.01;
+
+  if (bot.onGround && bot.jumpCooldown <= 0 && (playerAbove || stuckOnGround || randomHop)) {
+    bot.vy = -(bot.jumpStrength + Math.random() * 1.2);
+    bot.onGround = false;
+    bot.jumpsUsed = 1;
+    bot.jumpCooldown = 18 + Math.floor(Math.random() * 22);
+  } else if (!bot.onGround && bot.jumpsUsed < bot.maxJumps && bot.jumpCooldown <= 0) {
+    // Midair boost helps bots keep up when the player climbs quickly.
+    if (toPlayerY < -120 && Math.random() < 0.08) {
+      bot.vy = -(bot.jumpStrength - 0.9);
+      bot.jumpsUsed += 1;
+      bot.jumpCooldown = 20 + Math.floor(Math.random() * 20);
+    }
+  }
+
+  bot.vy = Math.min(bot.vy + GRAVITY, MAX_FALL_SPEED);
+
+  bot.x += bot.vx;
+  resolveHorizontalCollisions(bot, platforms);
+  keepInsideWalls(bot);
+
+  bot.y += bot.vy;
+  resolveVerticalCollisions(bot, platforms);
+
+  if (bot.y < 0) {
+    bot.y = 0;
+    bot.vy = 0;
+  }
+
+  if (bot.y > WORLD.height + 220) {
+    Object.assign(bot, createBot(Math.floor(Math.random() * BOT_COUNT)));
+  }
+}
+
+function updateBots() {
+  for (const bot of bots) {
+    updateSingleBot(bot);
   }
 }
 
@@ -274,6 +382,7 @@ function update() {
   }
 
   updatePlayer();
+  updateBots();
   checkHazards();
   checkGoal();
   updateCamera();
@@ -369,6 +478,20 @@ function drawGoal() {
   ctx.globalAlpha = 1;
 }
 
+function drawBots() {
+  for (const bot of bots) {
+    ctx.fillStyle = `hsl(${bot.tintHue}, 72%, 56%)`;
+    ctx.fillRect(bot.x, bot.y, bot.w, bot.h);
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+    ctx.fillRect(bot.x + 3, bot.y + 6, bot.w - 6, bot.h - 12);
+
+    ctx.fillStyle = "#152447";
+    ctx.fillRect(bot.x + 4, bot.y + 14, 3, 3);
+    ctx.fillRect(bot.x + bot.w - 7, bot.y + 14, 3, 3);
+  }
+}
+
 function drawPlayer() {
   ctx.fillStyle = "#2f55c6";
   ctx.fillRect(player.x, player.y, player.w, player.h);
@@ -427,6 +550,7 @@ function draw() {
   drawWalls();
   drawPlatforms();
   drawHazards();
+  drawBots();
   drawGoal();
   drawPlayer();
   ctx.restore();
