@@ -15,6 +15,7 @@ The level includes:
 - No score counter and no checkpoint system
 - A skinnier player character with slightly higher gravity
 - 3 AI bots that always follow/chase you and copy your jumps, with unique size/color and triple jump
+- A picture token (`image-removebg-preview (2).png`) appears above a random runner and transfers on contact
 
 ## Controls
 
