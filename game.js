@@ -106,7 +106,7 @@ function createBot(index) {
     vx: 0,
     vy: 0,
     onGround: false,
-    maxJumps: 2,
+    maxJumps: 3,
     jumpsUsed: 0,
     maxSpeed: 5.3 - width * 0.065,
     jumpStrength: 11.2 + (height - 34) * 0.06,
