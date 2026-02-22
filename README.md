@@ -15,6 +15,7 @@ The level includes:
 - No score counter and no checkpoint system
 - A skinnier player character with slightly higher gravity
 - 3 AI bots in tag mode: holder chases non-holders, non-holders run from the holder (and bots still mimic jumps)
+- When a bot holds the picture, it targets the player about 75% of retargets
 - A picture token (`image-removebg-preview (2).png`) appears above a random runner and transfers on contact
 
 ## Controls

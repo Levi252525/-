@@ -118,6 +118,8 @@ function createBot(index) {
     copyJumpTimer: 0,
     queuedJumpId: 0,
     lastCopiedJumpId: 0,
+    chaseRetargetTimer: 0,
+    prefersPlayerTarget: true,
     tintHue,
     tintSat,
     tintLight,
@@ -377,15 +379,23 @@ function getEntityCenterX(entity) {
 function getBotBehavior(bot) {
   const holder = getCurrentTokenHolder();
   if (holder.type === "bot" && holder.botId === bot.id) {
-    const participants = getParticipants();
+    const participants = getParticipants().filter((participant) => participant.entity !== bot);
+    const nonPlayerTargets = participants.filter((participant) => participant.type === "bot");
+
+    if (bot.chaseRetargetTimer <= 0) {
+      bot.prefersPlayerTarget = nonPlayerTargets.length === 0 ? true : Math.random() < 0.75;
+      bot.chaseRetargetTimer = 18 + Math.floor(Math.random() * 18);
+    } else {
+      bot.chaseRetargetTimer -= 1;
+    }
+
+    if (bot.prefersPlayerTarget) {
+      return { mode: "chase", targetEntity: player };
+    }
+
     let targetEntity = player;
     let bestDistance = Number.POSITIVE_INFINITY;
-
-    for (const participant of participants) {
-      if (participant.entity === bot) {
-        continue;
-      }
-
+    for (const participant of nonPlayerTargets) {
       const dx = getEntityCenterX(participant.entity) - getEntityCenterX(bot);
       const dy = participant.entity.y - bot.y;
       const distance = dx * dx + dy * dy;
