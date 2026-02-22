@@ -362,6 +362,49 @@ function chooseBotTargetPlatform(bot) {
   return best;
 }
 
+function placeBotNearPlayer(bot) {
+  const playerCenterX = getEntityCenterX(player);
+  let landingPlatform = null;
+
+  for (const platform of platforms) {
+    if (platform.h > 24) {
+      continue;
+    }
+
+    const closeHorizontally =
+      playerCenterX >= platform.x - 40 && playerCenterX <= platform.x + platform.w + 40;
+    const closeVertically = platform.y >= player.y - 40;
+    if (!closeHorizontally || !closeVertically) {
+      continue;
+    }
+
+    if (!landingPlatform || platform.y < landingPlatform.y) {
+      landingPlatform = platform;
+    }
+  }
+
+  const laneOffset = (bot.id - Math.floor(BOT_COUNT / 2)) * 30;
+  bot.x = clamp(
+    playerCenterX - bot.w * 0.5 + laneOffset,
+    WALL_THICKNESS,
+    WORLD.width - WALL_THICKNESS - bot.w
+  );
+
+  if (landingPlatform) {
+    bot.y = landingPlatform.y - bot.h;
+  } else {
+    bot.y = clamp(player.y + 20, 0, WORLD.height - bot.h);
+  }
+
+  bot.vx = 0;
+  bot.vy = 0;
+  bot.onGround = true;
+  bot.jumpsUsed = 0;
+  bot.jumpCooldown = 6;
+  bot.queuedJumpId = 0;
+  bot.copyJumpTimer = 0;
+}
+
 function updateSingleBot(bot) {
   const acceleration = 0.58;
   const friction = 0.9;
@@ -445,8 +488,15 @@ function updateSingleBot(bot) {
     bot.vy = 0;
   }
 
+  const xDistance = Math.abs(getEntityCenterX(player) - getEntityCenterX(bot));
+  const yDistance = Math.abs(player.y - bot.y);
+  if (xDistance > 430 || yDistance > 420) {
+    placeBotNearPlayer(bot);
+    return;
+  }
+
   if (bot.y > WORLD.height + 220) {
-    Object.assign(bot, createBot(bot.id));
+    placeBotNearPlayer(bot);
   }
 }
 
