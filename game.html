@@ -195,6 +195,7 @@ function createBot(index) {
   const tintSat = 58 + (index % 4) * 10;
   const tintLight = 42 + ((index * 5) % 4) * 8;
   return {
+    id: index,
     x: WALL_THICKNESS + 40 + ((index * 47) % laneWidth),
     y: spawnFloorY - height - (index % 5) * 10,
     w: width,
@@ -207,8 +208,6 @@ function createBot(index) {
     maxSpeed: 5.3 - width * 0.065,
     jumpStrength: 11.2 + (height - 34) * 0.06,
     jumpCooldown: 8 + (index % 9),
-    roamDir: index % 2 === 0 ? 1 : -1,
-    roamTimer: 25 + ((index * 17) % 65),
     tintHue,
     tintSat,
     tintLight,
@@ -283,7 +282,7 @@ function resetGame() {
   introHintFrames = 210;
   resetPlayerToSpawn();
   resetBots();
-  hudStatus.textContent = "No score / no checkpoints - 20 bots active";
+  hudStatus.textContent = "No score / no checkpoints - 20 platform-follow bots";
 }
 
 function resolveHorizontalCollisions(entity, solids) {
@@ -385,22 +384,64 @@ function updatePlayer() {
   }
 }
 
+function getEntityCenterX(entity) {
+  return entity.x + entity.w * 0.5;
+}
+
+function chooseBotTargetPlatform(bot) {
+  const playerCenterX = getEntityCenterX(player);
+  const botCenterX = getEntityCenterX(bot);
+  const playerAbove = player.y < bot.y - 16;
+
+  let best = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (const platform of platforms) {
+    if (platform.h > 24) {
+      continue;
+    }
+
+    const platformIsAbove = platform.y < bot.y - 8;
+    if (playerAbove && !platformIsAbove) {
+      continue;
+    }
+
+    const verticalGap = Math.abs(platform.y - bot.y);
+    if (verticalGap > 230) {
+      continue;
+    }
+
+    const aimX = clamp(playerCenterX, platform.x + 8, platform.x + platform.w - 8);
+    const distanceToAim = Math.abs(aimX - botCenterX);
+    if (distanceToAim > 280 && playerAbove) {
+      continue;
+    }
+
+    const score =
+      distanceToAim * 0.8 +
+      Math.abs(aimX - playerCenterX) * 0.45 +
+      verticalGap * (playerAbove ? 0.7 : 0.2);
+
+    if (score < bestScore) {
+      bestScore = score;
+      best = { platform, aimX, playerAbove };
+    }
+  }
+
+  return best;
+}
+
 function updateSingleBot(bot) {
   const acceleration = 0.46;
   const friction = 0.84;
-  const toPlayerX = player.x + player.w * 0.5 - (bot.x + bot.w * 0.5);
-  const toPlayerY = player.y - bot.y;
+  const playerCenterX = getEntityCenterX(player);
+  const botCenterX = getEntityCenterX(bot);
+  const target = chooseBotTargetPlatform(bot);
+  const targetX = target ? target.aimX : playerCenterX;
+  const targetAbove = Boolean(target && target.platform.y < bot.y - 8);
 
-  bot.roamTimer -= 1;
-  if (bot.roamTimer <= 0) {
-    bot.roamDir = Math.random() < 0.5 ? -1 : 1;
-    bot.roamTimer = 26 + Math.floor(Math.random() * 70);
-  }
-
-  let intentX = Math.sign(toPlayerX);
-  if (Math.abs(toPlayerX) < 30) {
-    intentX = bot.roamDir;
-  } else if (Math.abs(toPlayerX) < 10) {
+  let intentX = Math.sign(targetX - botCenterX);
+  if (Math.abs(targetX - botCenterX) < 8) {
     intentX = 0;
   }
 
@@ -419,21 +460,33 @@ function updateSingleBot(bot) {
     bot.jumpCooldown -= 1;
   }
 
-  const playerAbove = toPlayerY < -44;
-  const stuckOnGround = bot.onGround && Math.abs(bot.vx) < 0.12 && Math.abs(toPlayerX) > 36;
-  const randomHop = bot.onGround && Math.random() < 0.01;
+  const playerAboveBot = player.y < bot.y - 40;
+  const horizontallyReady = Math.abs(targetX - botCenterX) < 26;
+  const onBottomFloor = bot.y + bot.h >= WORLD.height - 34;
 
-  if (bot.onGround && bot.jumpCooldown <= 0 && (playerAbove || stuckOnGround || randomHop)) {
-    bot.vy = -(bot.jumpStrength + Math.random() * 1.2);
+  if (bot.onGround && bot.jumpCooldown <= 0) {
+    const shouldGroundJump = (targetAbove && horizontallyReady) || (onBottomFloor && playerAboveBot);
+    if (shouldGroundJump) {
+      bot.vy = -(bot.jumpStrength + (playerAboveBot ? 0.4 : 0));
+      bot.onGround = false;
+      bot.jumpsUsed = 1;
+      bot.jumpCooldown = 12;
+    }
+  } else if (!bot.onGround && bot.jumpsUsed < bot.maxJumps && bot.jumpCooldown <= 0) {
+    const nearApex = bot.vy > -0.7;
+    const alignedForSecondJump = Math.abs(targetX - botCenterX) < 88;
+    if (targetAbove && nearApex && alignedForSecondJump) {
+      bot.vy = -(bot.jumpStrength - 0.8);
+      bot.jumpsUsed += 1;
+      bot.jumpCooldown = 14;
+    }
+  }
+
+  if (bot.onGround && Math.abs(playerCenterX - botCenterX) < 10 && playerAboveBot && bot.jumpCooldown <= 0) {
+    bot.vy = -(bot.jumpStrength + 0.6);
     bot.onGround = false;
     bot.jumpsUsed = 1;
-    bot.jumpCooldown = 18 + Math.floor(Math.random() * 22);
-  } else if (!bot.onGround && bot.jumpsUsed < bot.maxJumps && bot.jumpCooldown <= 0) {
-    if (toPlayerY < -120 && Math.random() < 0.08) {
-      bot.vy = -(bot.jumpStrength - 0.9);
-      bot.jumpsUsed += 1;
-      bot.jumpCooldown = 20 + Math.floor(Math.random() * 20);
-    }
+    bot.jumpCooldown = 12;
   }
 
   bot.vy = Math.min(bot.vy + GRAVITY, MAX_FALL_SPEED);
@@ -451,7 +504,7 @@ function updateSingleBot(bot) {
   }
 
   if (bot.y > WORLD.height + 220) {
-    Object.assign(bot, createBot(Math.floor(Math.random() * BOT_COUNT)));
+    Object.assign(bot, createBot(bot.id));
   }
 }
 
