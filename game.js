@@ -269,7 +269,7 @@ function resetGame() {
   resetPlayerToSpawn();
   resetBots();
   assignRandomTokenHolder();
-  hudStatus.textContent = "No score / no checkpoints - tag mode (holder chases)";
+  hudStatus.textContent = "No score / no checkpoints - tag mode (holder chases, others flee you)";
 }
 
 function resolveHorizontalCollisions(entity, solids) {
@@ -417,7 +417,8 @@ function getBotBehavior(bot) {
   const dyToPlayer = player.y - bot.y;
   const distToPlayer = dxToPlayer * dxToPlayer + dyToPlayer * dyToPlayer;
 
-  const threatEntity = distToPlayer <= distToHolder ? player : holderEntity;
+  // Prefer treating the player as a threat when distances are close.
+  const threatEntity = distToPlayer <= distToHolder * 1.15 ? player : holderEntity;
   return { mode: "flee", targetEntity: threatEntity };
 }
 
