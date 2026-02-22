@@ -14,7 +14,8 @@ The level includes:
 - Double jump movement (you can jump once more while airborne)
 - No score counter and no checkpoint system
 - A skinnier player character with slightly higher gravity
-- 3 AI bots in tag mode: holder chases non-holders, non-holders run from the holder (and bots still mimic jumps)
+- 3 AI bots in tag mode: holder chases non-holders, and non-holders flee the nearest threat (holder or player)
+- When a bot holds the picture, it targets the player about 75% of retargets
 - A picture token (`image-removebg-preview (2).png`) appears above a random runner and transfers on contact
 
 ## Controls
