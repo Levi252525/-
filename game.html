@@ -112,6 +112,7 @@ const CAMERA_FOLLOW_Y = 0.62;
 const PLAYER_WIDTH = 30;
 const PLAYER_HEIGHT = 52;
 const BOT_COUNT = 3;
+const TOKEN_TRANSFER_COOLDOWN = 14;
 
 const keys = {
   left: false,
@@ -227,6 +228,22 @@ const state = {
   mode: "playing",
 };
 
+const tokenImage = new Image();
+let tokenImageLoaded = false;
+tokenImage.onload = () => {
+  tokenImageLoaded = true;
+};
+tokenImage.onerror = () => {
+  tokenImageLoaded = false;
+};
+tokenImage.src = encodeURI("./image-removebg-preview (2).png");
+
+const tokenState = {
+  holderType: "player",
+  holderBotId: -1,
+  transferCooldown: 0,
+};
+
 const platformTexture = new Image();
 let platformTextureLoaded = false;
 let platformTexturePattern = null;
@@ -266,6 +283,57 @@ function intersects(a, b) {
   );
 }
 
+function getParticipants() {
+  const participants = [{ type: "player", botId: -1, entity: player }];
+  for (const bot of bots) {
+    participants.push({ type: "bot", botId: bot.id, entity: bot });
+  }
+  return participants;
+}
+
+function getCurrentTokenHolder() {
+  if (tokenState.holderType === "bot") {
+    const holderBot = bots.find((bot) => bot.id === tokenState.holderBotId);
+    if (holderBot) {
+      return { type: "bot", botId: holderBot.id, entity: holderBot };
+    }
+  }
+
+  return { type: "player", botId: -1, entity: player };
+}
+
+function setTokenHolder(type, botId) {
+  tokenState.holderType = type;
+  tokenState.holderBotId = type === "bot" ? botId : -1;
+  tokenState.transferCooldown = TOKEN_TRANSFER_COOLDOWN;
+}
+
+function assignRandomTokenHolder() {
+  const participants = getParticipants();
+  const randomParticipant = participants[Math.floor(Math.random() * participants.length)];
+  setTokenHolder(randomParticipant.type, randomParticipant.botId);
+}
+
+function updateTokenTransfer() {
+  if (tokenState.transferCooldown > 0) {
+    tokenState.transferCooldown -= 1;
+    return;
+  }
+
+  const holder = getCurrentTokenHolder();
+  const participants = getParticipants();
+  for (const participant of participants) {
+    if (participant.entity === holder.entity) {
+      continue;
+    }
+
+    if (intersects(holder.entity, participant.entity)) {
+      setTokenHolder(participant.type, participant.botId);
+      return;
+    }
+  }
+}
+
 function resetPlayerToSpawn() {
   player.x = player.spawnX;
   player.y = player.spawnY;
@@ -295,7 +363,8 @@ function resetGame() {
   playerJumpSignalVy = 0;
   resetPlayerToSpawn();
   resetBots();
-  hudStatus.textContent = "No score / no checkpoints - 3 always-follow mimic bots";
+  assignRandomTokenHolder();
+  hudStatus.textContent = "No score / no checkpoints - pass the picture";
 }
 
 function resolveHorizontalCollisions(entity, solids) {
@@ -629,6 +698,7 @@ function update() {
 
   updatePlayer();
   updateBots();
+  updateTokenTransfer();
   checkHazards();
   checkGoal();
   updateCamera();
@@ -746,6 +816,23 @@ function drawBots() {
   }
 }
 
+function drawTokenIcon() {
+  const holder = getCurrentTokenHolder();
+  const markerSize = 30;
+  const x = holder.entity.x + holder.entity.w * 0.5 - markerSize * 0.5;
+  const y = holder.entity.y - markerSize - 10;
+
+  if (tokenImageLoaded) {
+    ctx.drawImage(tokenImage, x, y, markerSize, markerSize);
+    return;
+  }
+
+  ctx.fillStyle = "#ffd766";
+  ctx.beginPath();
+  ctx.arc(x + markerSize / 2, y + markerSize / 2, markerSize / 2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 function drawPlayer() {
   ctx.fillStyle = "#2f55c6";
   ctx.fillRect(player.x, player.y, player.w, player.h);
@@ -807,6 +894,7 @@ function draw() {
   drawBots();
   drawGoal();
   drawPlayer();
+  drawTokenIcon();
   ctx.restore();
 
   drawIntroHint();
