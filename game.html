@@ -210,7 +210,7 @@ function createBot(index) {
     maxSpeed: 5.7 - width * 0.045,
     jumpStrength: 11.2 + (height - 34) * 0.06,
     jumpCooldown: 0,
-    copyJumpLag: index % 2,
+    copyJumpLag: 0,
     copyJumpTimer: 0,
     queuedJumpId: 0,
     lastCopiedJumpId: 0,
@@ -295,7 +295,7 @@ function resetGame() {
   playerJumpSignalVy = 0;
   resetPlayerToSpawn();
   resetBots();
-  hudStatus.textContent = "No score / no checkpoints - 3 chasing mimic bots";
+  hudStatus.textContent = "No score / no checkpoints - 3 always-follow mimic bots";
 }
 
 function resolveHorizontalCollisions(entity, solids) {
@@ -463,11 +463,10 @@ function updateSingleBot(bot) {
   const friction = 0.9;
   const playerCenterX = getEntityCenterX(player);
   const botCenterX = getEntityCenterX(bot);
-  const target = chooseBotTargetPlatform(bot);
-  const targetX = target ? target.aimX : playerCenterX;
+  const targetX = playerCenterX;
 
   let intentX = Math.sign(targetX - botCenterX);
-  if (Math.abs(targetX - botCenterX) < 8) {
+  if (Math.abs(targetX - botCenterX) < 4) {
     intentX = 0;
   }
 
@@ -477,7 +476,7 @@ function updateSingleBot(bot) {
     bot.vx *= friction;
   }
 
-  const chaseDistanceX = Math.abs(targetX - botCenterX);
+  const chaseDistanceX = Math.abs(playerCenterX - botCenterX);
   const dynamicMaxSpeed = bot.maxSpeed + (chaseDistanceX > 140 ? 1.4 : 0.4);
   bot.vx = clamp(bot.vx, -dynamicMaxSpeed, dynamicMaxSpeed);
   if (Math.abs(bot.vx) < 0.03) {
@@ -511,6 +510,20 @@ function updateSingleBot(bot) {
 
       bot.lastCopiedJumpId = bot.queuedJumpId;
       bot.queuedJumpId = 0;
+    }
+  }
+
+  const playerAboveBot = player.y < bot.y - 28;
+  if (bot.onGround && bot.jumpCooldown <= 0 && bot.queuedJumpId === 0 && playerAboveBot) {
+    bot.vy = -(bot.jumpStrength + 0.5);
+    bot.onGround = false;
+    bot.jumpsUsed = 1;
+    bot.jumpCooldown = 8;
+  } else if (!bot.onGround && bot.jumpCooldown <= 0 && playerAboveBot && bot.jumpsUsed < bot.maxJumps) {
+    if (bot.vy > -0.6) {
+      bot.vy = -(bot.jumpStrength - 0.6);
+      bot.jumpsUsed += 1;
+      bot.jumpCooldown = 8;
     }
   }
 
