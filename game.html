@@ -505,7 +505,17 @@ function getBotBehavior(bot) {
     return { mode: "chase", targetEntity };
   }
 
-  return { mode: "flee", targetEntity: holder.entity };
+  const holderEntity = holder.entity;
+  const dxToHolder = getEntityCenterX(holderEntity) - getEntityCenterX(bot);
+  const dyToHolder = holderEntity.y - bot.y;
+  const distToHolder = dxToHolder * dxToHolder + dyToHolder * dyToHolder;
+
+  const dxToPlayer = getEntityCenterX(player) - getEntityCenterX(bot);
+  const dyToPlayer = player.y - bot.y;
+  const distToPlayer = dxToPlayer * dxToPlayer + dyToPlayer * dyToPlayer;
+
+  const threatEntity = distToPlayer <= distToHolder ? player : holderEntity;
+  return { mode: "flee", targetEntity: threatEntity };
 }
 
 function chooseBotTargetPlatform(bot, focusEntity, mode) {
