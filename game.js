@@ -5,7 +5,7 @@ const hudStatus = document.getElementById("hud-status");
 
 const WORLD = {
   width: 960,
-  height: 3600,
+  height: 1500,
 };
 
 const WALL_THICKNESS = 30;
@@ -30,29 +30,29 @@ let playerJumpSignalVy = 0;
 
 function buildPlatforms() {
   const list = [
-    { x: WALL_THICKNESS + 145, y: WORLD.height - 132, w: 250, h: 18 },
-    { x: WORLD.width - WALL_THICKNESS - 315, y: WORLD.height - 240, w: 210, h: 16 },
-    { x: WALL_THICKNESS + 110, y: WORLD.height - 350, w: 170, h: 16 },
+    { x: WALL_THICKNESS + 145, y: WORLD.height - 120, w: 250, h: 18 },
+    { x: WORLD.width - WALL_THICKNESS - 315, y: WORLD.height - 220, w: 210, h: 16 },
+    { x: WALL_THICKNESS + 110, y: WORLD.height - 315, w: 170, h: 16 },
   ];
 
-  let y = WORLD.height - 470;
-  for (let i = 0; i < 27; i += 1) {
-    const width = i % 6 === 5 ? 220 : 165;
+  let y = WORLD.height - 410;
+  for (let i = 0; i < 10; i += 1) {
+    const width = i % 5 === 4 ? 200 : 160;
     let x;
 
     if (i % 3 === 0) {
-      x = WALL_THICKNESS + 75 + (i % 2) * 40;
+      x = WALL_THICKNESS + 78 + (i % 2) * 30;
     } else if (i % 3 === 1) {
-      x = WORLD.width - WALL_THICKNESS - width - 90 - ((i + 1) % 2) * 35;
+      x = WORLD.width - WALL_THICKNESS - width - 78 - ((i + 1) % 2) * 24;
     } else {
-      x = WORLD.width / 2 - width / 2 + (i % 2 === 0 ? -75 : 75);
+      x = WORLD.width / 2 - width / 2 + (i % 2 === 0 ? -62 : 62);
     }
 
     list.push({ x, y, w: width, h: 16 });
-    y -= 114;
+    y -= 94;
   }
 
-  list.push({ x: WORLD.width / 2 - 120, y: 176, w: 240, h: 16 });
+  list.push({ x: WORLD.width / 2 - 120, y: 130, w: 240, h: 16 });
   list.push({
     x: WALL_THICKNESS,
     y: WORLD.height - 32,
