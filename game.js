@@ -144,6 +144,7 @@ const tokenState = {
 const spiralImage = new Image();
 let spiralImageLoaded = false;
 const spiralImageOptions = [
+  "./purple-spiral.svg",
   "./purple-spiral.png",
   "./purple spiral.png",
   "./purple_spiral.png",
