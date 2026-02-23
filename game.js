@@ -72,12 +72,12 @@ const hazards = [];
 function buildBouncePads() {
   const padWidth = 62;
   const padHeight = 8;
+  const floor = platforms[platforms.length - 1];
+  const edgeInset = 26;
 
   return [
-    { id: 0, x: platforms[0].x + platforms[0].w * 0.5 - padWidth * 0.5, y: platforms[0].y, w: padWidth, h: padHeight, flashFrames: 0 },
-    { id: 1, x: platforms[1].x + platforms[1].w * 0.5 - padWidth * 0.5, y: platforms[1].y, w: padWidth, h: padHeight, flashFrames: 0 },
-    { id: 2, x: platforms[2].x + platforms[2].w * 0.5 - padWidth * 0.5, y: platforms[2].y, w: padWidth, h: padHeight, flashFrames: 0 },
-    { id: 3, x: platforms[5].x + platforms[5].w * 0.5 - padWidth * 0.5, y: platforms[5].y, w: padWidth, h: padHeight, flashFrames: 0 },
+    { id: 0, x: floor.x + edgeInset, y: floor.y, w: padWidth, h: padHeight, flashFrames: 0 },
+    { id: 1, x: floor.x + floor.w - padWidth - edgeInset, y: floor.y, w: padWidth, h: padHeight, flashFrames: 0 },
   ];
 }
 
