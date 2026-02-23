@@ -19,9 +19,10 @@ const TOKEN_TRANSFER_COOLDOWN = 14;
 const ROUND_TIMER_SECONDS = 20;
 const ROUND_DURATION_FRAMES = ROUND_TIMER_SECONDS * 60;
 const ELIMINATION_SPIN_FRAMES = 2 * 60;
+const BOT_NAMES = ["Rex", "Nova", "Blitz", "Dash", "Vex", "Orbit"];
 const BOUNCE_PAD_COOLDOWN_FRAMES = 14;
-const BOUNCE_PAD_PLAYER_STRENGTH = 19.4;
-const BOUNCE_PAD_BOT_STRENGTH = 18.4;
+const BOUNCE_PAD_PLAYER_STRENGTH = 24.8;
+const BOUNCE_PAD_BOT_STRENGTH = 23.6;
 const POWER_UP_DURATION_FRAMES = 8 * 60;
 const POWER_UP_RESPAWN_MIN_FRAMES = 6 * 60;
 const POWER_UP_RESPAWN_MAX_FRAMES = 11 * 60;
@@ -130,6 +131,7 @@ function createBot(index) {
 
   return {
     id: index,
+    name: BOT_NAMES[index] ?? `Bot ${index + 1}`,
     x: clamp(spawnSlots[index % spawnSlots.length], WALL_THICKNESS, WORLD.width - WALL_THICKNESS - width),
     y: platforms[0].y - height,
     w: width,
@@ -503,7 +505,7 @@ function getWinnerLabel() {
   }
 
   if (state.winnerType === "bot") {
-    return `Bot ${state.winnerBotId + 1}`;
+    return getBotDisplayName(state.winnerBotId);
   }
 
   return "Nobody";
@@ -518,7 +520,7 @@ function getHolderLabel(holder) {
     return "Player";
   }
 
-  return `Bot ${holder.botId + 1}`;
+  return getBotDisplayName(holder.botId);
 }
 
 function updateHudStatus() {
@@ -543,6 +545,15 @@ function updateHudStatus() {
 
 function getEliminationTarget() {
   return getParticipantByRef(state.eliminationTargetType, state.eliminationTargetBotId);
+}
+
+function getBotDisplayName(botId) {
+  const bot = bots.find((candidate) => candidate.id === botId);
+  if (!bot) {
+    return `Bot ${botId + 1}`;
+  }
+
+  return bot.name || `Bot ${botId + 1}`;
 }
 
 function eliminateParticipant(participant) {
@@ -1216,6 +1227,13 @@ function drawBots() {
     const rightEyeX = bot.x + bot.w - Math.max(2, Math.floor(bot.w * 0.24)) - eyeSize;
     ctx.fillRect(leftEyeX, eyeY, eyeSize, eyeSize);
     ctx.fillRect(rightEyeX, eyeY, eyeSize, eyeSize);
+
+    ctx.fillStyle = "rgba(15, 22, 46, 0.78)";
+    ctx.fillRect(bot.x - 10, bot.y - 20, bot.w + 20, 14);
+    ctx.fillStyle = "#f4f7ff";
+    ctx.font = '700 11px "Segoe UI", sans-serif';
+    ctx.textAlign = "center";
+    ctx.fillText(bot.name, bot.x + bot.w * 0.5, bot.y - 9);
   }
 }
 
@@ -1316,6 +1334,31 @@ function drawTextCenter(y, text, size = 36, color = "#f7f9ff") {
   ctx.fillText(text, canvas.width / 2, y);
 }
 
+function drawScreenTimer() {
+  const rawSeconds = Math.ceil(state.roundFramesRemaining / 60);
+  const secondsLeft = state.mode === "finished" ? 0 : Math.max(0, rawSeconds);
+  const timerText = `${String(secondsLeft).padStart(2, "0")}s`;
+  const x = canvas.width - 166;
+  const y = 20;
+  const w = 146;
+  const h = 52;
+
+  ctx.fillStyle = "rgba(9, 14, 37, 0.58)";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "rgba(188, 205, 255, 0.55)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+
+  ctx.fillStyle = "#c6d7ff";
+  ctx.font = '600 12px "Segoe UI", sans-serif';
+  ctx.textAlign = "center";
+  ctx.fillText("TIMER", x + w / 2, y + 16);
+
+  ctx.fillStyle = "#f4f8ff";
+  ctx.font = '800 24px "Segoe UI", sans-serif';
+  ctx.fillText(timerText, x + w / 2, y + 43);
+}
+
 function drawOverlay() {
   if (state.mode !== "finished") {
     return;
@@ -1358,6 +1401,7 @@ function draw() {
   ctx.restore();
 
   drawIntroHint();
+  drawScreenTimer();
   drawOverlay();
 }
 
