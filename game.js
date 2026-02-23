@@ -16,6 +16,9 @@ const PLAYER_WIDTH = 30;
 const PLAYER_HEIGHT = 52;
 const BOT_COUNT = 3;
 const TOKEN_TRANSFER_COOLDOWN = 14;
+const ROUND_TIMER_SECONDS = 20;
+const ROUND_DURATION_FRAMES = ROUND_TIMER_SECONDS * 60;
+const ELIMINATION_SPIN_FRAMES = 2 * 60;
 
 const keys = {
   left: false,
@@ -67,6 +70,7 @@ const player = {
   jumpsUsed: 0,
   spawnX: playerSpawn.x,
   spawnY: playerSpawn.y,
+  alive: true,
 };
 
 function createBot(index) {
@@ -90,6 +94,7 @@ function createBot(index) {
     vx: 0,
     vy: 0,
     onGround: false,
+    alive: true,
     maxJumps: 3,
     jumpsUsed: 0,
     maxSpeed: 5.8 - width * 0.04,
@@ -112,6 +117,12 @@ const bots = Array.from({ length: BOT_COUNT }, (_, index) => createBot(index));
 
 const state = {
   mode: "playing",
+  roundFramesRemaining: ROUND_DURATION_FRAMES,
+  eliminationFramesRemaining: 0,
+  eliminationTargetType: "none",
+  eliminationTargetBotId: -1,
+  winnerType: "none",
+  winnerBotId: -1,
 };
 
 const tokenImage = new Image();
@@ -129,6 +140,30 @@ const tokenState = {
   holderBotId: -1,
   transferCooldown: 0,
 };
+
+const spiralImage = new Image();
+let spiralImageLoaded = false;
+const spiralImageOptions = [
+  "./purple-spiral.png",
+  "./purple spiral.png",
+  "./purple_spiral.png",
+  "./purple-spiral.webp",
+  "./purple spiral.webp",
+];
+
+function loadSpiralImage(index) {
+  if (index >= spiralImageOptions.length) {
+    return;
+  }
+
+  spiralImage.onload = () => {
+    spiralImageLoaded = true;
+  };
+  spiralImage.onerror = () => {
+    loadSpiralImage(index + 1);
+  };
+  spiralImage.src = encodeURI(spiralImageOptions[index]);
+}
 
 const platformTexture = new Image();
 let platformTextureLoaded = false;
@@ -155,6 +190,7 @@ function loadPlatformTexture(index) {
 }
 
 loadPlatformTexture(0);
+loadSpiralImage(0);
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -174,22 +210,49 @@ function getEntityCenterX(entity) {
 }
 
 function getParticipants() {
-  const participants = [{ type: "player", botId: -1, entity: player }];
+  const participants = [];
+  if (player.alive) {
+    participants.push({ type: "player", botId: -1, entity: player });
+  }
   for (const bot of bots) {
-    participants.push({ type: "bot", botId: bot.id, entity: bot });
+    if (bot.alive) {
+      participants.push({ type: "bot", botId: bot.id, entity: bot });
+    }
   }
   return participants;
 }
 
-function getCurrentTokenHolder() {
-  if (tokenState.holderType === "bot") {
-    const holderBot = bots.find((bot) => bot.id === tokenState.holderBotId);
-    if (holderBot) {
-      return { type: "bot", botId: holderBot.id, entity: holderBot };
+function getParticipantByRef(type, botId) {
+  if (type === "player") {
+    return player.alive ? { type: "player", botId: -1, entity: player } : null;
+  }
+
+  if (type === "bot") {
+    const bot = bots.find((candidate) => candidate.id === botId && candidate.alive);
+    if (bot) {
+      return { type: "bot", botId: bot.id, entity: bot };
     }
   }
 
-  return { type: "player", botId: -1, entity: player };
+  return null;
+}
+
+function getCurrentTokenHolder() {
+  const currentHolder = getParticipantByRef(tokenState.holderType, tokenState.holderBotId);
+  if (currentHolder) {
+    return currentHolder;
+  }
+
+  const participants = getParticipants();
+  if (participants.length === 0) {
+    return null;
+  }
+
+  const fallback = participants[0];
+  tokenState.holderType = fallback.type;
+  tokenState.holderBotId = fallback.botId;
+  tokenState.transferCooldown = 0;
+  return fallback;
 }
 
 function setTokenHolder(type, botId) {
@@ -200,18 +263,34 @@ function setTokenHolder(type, botId) {
 
 function assignRandomTokenHolder() {
   const participants = getParticipants();
+  if (participants.length === 0) {
+    tokenState.holderType = "none";
+    tokenState.holderBotId = -1;
+    tokenState.transferCooldown = 0;
+    return null;
+  }
+
   const selected = participants[Math.floor(Math.random() * participants.length)];
   setTokenHolder(selected.type, selected.botId);
+  return selected;
 }
 
 function updateTokenTransfer() {
+  const participants = getParticipants();
+  if (participants.length <= 1) {
+    return;
+  }
+
   if (tokenState.transferCooldown > 0) {
     tokenState.transferCooldown -= 1;
     return;
   }
 
   const holder = getCurrentTokenHolder();
-  const participants = getParticipants();
+  if (!holder) {
+    return;
+  }
+
   for (const participant of participants) {
     if (participant.entity === holder.entity) {
       continue;
@@ -224,7 +303,132 @@ function updateTokenTransfer() {
   }
 }
 
+function getWinnerLabel() {
+  if (state.winnerType === "player") {
+    return "Player";
+  }
+
+  if (state.winnerType === "bot") {
+    return `Bot ${state.winnerBotId + 1}`;
+  }
+
+  return "Nobody";
+}
+
+function getHolderLabel(holder) {
+  if (!holder) {
+    return "None";
+  }
+
+  if (holder.type === "player") {
+    return "Player";
+  }
+
+  return `Bot ${holder.botId + 1}`;
+}
+
+function updateHudStatus() {
+  const aliveCount = getParticipants().length;
+
+  if (state.mode === "finished") {
+    hudStatus.textContent = `Winner: ${getWinnerLabel()} | Press R to reset arena`;
+    return;
+  }
+
+  if (state.eliminationFramesRemaining > 0) {
+    const holder = getParticipantByRef(state.eliminationTargetType, state.eliminationTargetBotId);
+    hudStatus.textContent = `Eliminating ${getHolderLabel(holder)}...`;
+    return;
+  }
+
+  const holder = getCurrentTokenHolder();
+  const secondsLeft = Math.ceil(state.roundFramesRemaining / 60);
+  hudStatus.textContent = `Timer: ${secondsLeft}s | Alive: ${aliveCount} | Holder: ${getHolderLabel(holder)}`;
+}
+
+function getEliminationTarget() {
+  return getParticipantByRef(state.eliminationTargetType, state.eliminationTargetBotId);
+}
+
+function eliminateParticipant(participant) {
+  if (!participant) {
+    return;
+  }
+
+  if (participant.type === "player") {
+    player.alive = false;
+    player.vx = 0;
+    player.vy = 0;
+    player.onGround = false;
+    player.jumpsUsed = 0;
+    keys.left = false;
+    keys.right = false;
+    return;
+  }
+
+  const bot = participant.entity;
+  bot.alive = false;
+  bot.vx = 0;
+  bot.vy = 0;
+  bot.onGround = false;
+  bot.jumpsUsed = 0;
+}
+
+function finishMatchIfNeeded() {
+  const aliveParticipants = getParticipants();
+  if (aliveParticipants.length > 1) {
+    return false;
+  }
+
+  state.mode = "finished";
+  if (aliveParticipants.length === 1) {
+    state.winnerType = aliveParticipants[0].type;
+    state.winnerBotId = aliveParticipants[0].botId;
+  } else {
+    state.winnerType = "none";
+    state.winnerBotId = -1;
+  }
+
+  return true;
+}
+
+function startEliminationPhase() {
+  const holder = getCurrentTokenHolder();
+  if (!holder) {
+    finishMatchIfNeeded();
+    return;
+  }
+
+  state.eliminationFramesRemaining = ELIMINATION_SPIN_FRAMES;
+  state.eliminationTargetType = holder.type;
+  state.eliminationTargetBotId = holder.botId;
+}
+
+function resolveEliminationPhase() {
+  if (state.eliminationFramesRemaining <= 0) {
+    return;
+  }
+
+  state.eliminationFramesRemaining -= 1;
+  if (state.eliminationFramesRemaining > 0) {
+    return;
+  }
+
+  const eliminated = getEliminationTarget();
+  eliminateParticipant(eliminated);
+  state.eliminationTargetType = "none";
+  state.eliminationTargetBotId = -1;
+
+  if (finishMatchIfNeeded()) {
+    return;
+  }
+
+  assignRandomTokenHolder();
+  state.roundFramesRemaining = ROUND_DURATION_FRAMES;
+}
+
 function resetPlayerToSpawn() {
+  player.alive = true;
   player.x = player.spawnX;
   player.y = player.spawnY;
   player.vx = 0;
@@ -247,6 +451,12 @@ function emitPlayerJumpSignal(jumpVelocity) {
 
 function resetGame() {
   state.mode = "playing";
+  state.roundFramesRemaining = ROUND_DURATION_FRAMES;
+  state.eliminationFramesRemaining = 0;
+  state.eliminationTargetType = "none";
+  state.eliminationTargetBotId = -1;
+  state.winnerType = "none";
+  state.winnerBotId = -1;
   jumpRequested = false;
   introHintFrames = 210;
   playerJumpSignalId = 0;
@@ -254,7 +464,7 @@ function resetGame() {
   resetPlayerToSpawn();
   resetBots();
   assignRandomTokenHolder();
-  hudStatus.textContent = "No score / no checkpoints - endless arena tag";
+  updateHudStatus();
 }
 
 function resolveHorizontalCollisions(entity, solids) {
@@ -359,24 +569,29 @@ function updatePlayer() {
 
 function getBotBehavior(bot) {
   const holder = getCurrentTokenHolder();
+  const participants = getParticipants().filter((participant) => participant.entity !== bot);
+  if (!holder || participants.length === 0) {
+    return { mode: "chase", targetEntity: bot };
+  }
+
   if (holder.type === "bot" && holder.botId === bot.id) {
-    const participants = getParticipants().filter((participant) => participant.entity !== bot);
+    const playerTarget = participants.find((participant) => participant.type === "player");
     const nonPlayerTargets = participants.filter((participant) => participant.type === "bot");
 
     if (bot.chaseRetargetTimer <= 0) {
-      bot.prefersPlayerTarget = nonPlayerTargets.length === 0 ? true : Math.random() < 0.75;
+      bot.prefersPlayerTarget = playerTarget ? nonPlayerTargets.length === 0 || Math.random() < 0.75 : false;
       bot.chaseRetargetTimer = 24;
     } else {
       bot.chaseRetargetTimer -= 1;
     }
 
-    if (bot.prefersPlayerTarget) {
-      return { mode: "chase", targetEntity: player };
+    if (bot.prefersPlayerTarget && playerTarget) {
+      return { mode: "chase", targetEntity: playerTarget.entity };
     }
 
-    let targetEntity = player;
+    let targetEntity = participants[0].entity;
     let bestDistance = Number.POSITIVE_INFINITY;
-    for (const participant of nonPlayerTargets) {
+    for (const participant of participants) {
       const dx = getEntityCenterX(participant.entity) - getEntityCenterX(bot);
       const dy = participant.entity.y - bot.y;
       const distance = dx * dx + dy * dy;
@@ -390,15 +605,20 @@ function getBotBehavior(bot) {
   }
 
   const holderEntity = holder.entity;
+  const playerTarget = participants.find((participant) => participant.type === "player");
+  if (!playerTarget) {
+    return { mode: "flee", targetEntity: holderEntity };
+  }
+
   const dxToHolder = getEntityCenterX(holderEntity) - getEntityCenterX(bot);
   const dyToHolder = holderEntity.y - bot.y;
   const distToHolder = dxToHolder * dxToHolder + dyToHolder * dyToHolder;
 
-  const dxToPlayer = getEntityCenterX(player) - getEntityCenterX(bot);
-  const dyToPlayer = player.y - bot.y;
+  const dxToPlayer = getEntityCenterX(playerTarget.entity) - getEntityCenterX(bot);
+  const dyToPlayer = playerTarget.entity.y - bot.y;
   const distToPlayer = dxToPlayer * dxToPlayer + dyToPlayer * dyToPlayer;
 
-  const threatEntity = distToPlayer <= distToHolder * 1.15 ? player : holderEntity;
+  const threatEntity = distToPlayer <= distToHolder * 1.15 ? playerTarget.entity : holderEntity;
   return { mode: "flee", targetEntity: threatEntity };
 }
 
@@ -563,7 +783,9 @@ function updateSingleBot(bot) {
 
 function updateBots() {
   for (const bot of bots) {
-    updateSingleBot(bot);
+    if (bot.alive) {
+      updateSingleBot(bot);
+    }
   }
 }
 
@@ -572,24 +794,56 @@ function checkHazards() {
 }
 
 function updateCamera() {
-  const target = player.y - canvas.height * CAMERA_FOLLOW_Y;
+  let focusEntity = null;
+  if (player.alive) {
+    focusEntity = player;
+  } else {
+    const holder = getCurrentTokenHolder();
+    if (holder) {
+      focusEntity = holder.entity;
+    } else {
+      const survivors = getParticipants();
+      focusEntity = survivors.length > 0 ? survivors[0].entity : player;
+    }
+  }
+
+  const target = focusEntity.y - canvas.height * CAMERA_FOLLOW_Y;
   cameraY = clamp(target, 0, WORLD.height - canvas.height);
 }
 
 function update() {
-  if (state.mode !== "playing") {
-    return;
-  }
+  if (state.mode === "playing") {
+    if (state.eliminationFramesRemaining > 0) {
+      resolveEliminationPhase();
+      updateCamera();
+    } else {
+      if (player.alive) {
+        updatePlayer();
+      } else {
+        jumpRequested = false;
+      }
 
-  updatePlayer();
-  updateBots();
-  updateTokenTransfer();
-  checkHazards();
-  updateCamera();
+      updateBots();
+      updateTokenTransfer();
+      checkHazards();
+
+      if (!finishMatchIfNeeded()) {
+        state.roundFramesRemaining -= 1;
+        if (state.roundFramesRemaining <= 0) {
+          state.roundFramesRemaining = 0;
+          startEliminationPhase();
+        }
+      }
+
+      updateCamera();
+    }
+  }
 
   if (introHintFrames > 0) {
     introHintFrames -= 1;
   }
+
+  updateHudStatus();
 }
 
 function drawBackground() {
@@ -650,6 +904,10 @@ function drawHazards() {
 
 function drawBots() {
   for (const bot of bots) {
+    if (!bot.alive) {
+      continue;
+    }
+
     ctx.fillStyle = `hsl(${bot.tintHue}, ${bot.tintSat}%, ${bot.tintLight}%)`;
     ctx.fillRect(bot.x, bot.y, bot.w, bot.h);
 
@@ -670,8 +928,66 @@ function drawBots() {
   }
 }
 
+function drawFallbackSpiral(radius) {
+  ctx.strokeStyle = "rgba(212, 129, 255, 0.92)";
+  ctx.lineWidth = Math.max(2.5, radius * 0.08);
+  ctx.beginPath();
+
+  const turns = 4.2;
+  const steps = 88;
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    const angle = t * Math.PI * 2 * turns;
+    const distance = radius * t;
+    const x = Math.cos(angle) * distance;
+    const y = Math.sin(angle) * distance;
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+
+  ctx.stroke();
+}
+
+function drawEliminationSpiral() {
+  if (state.eliminationFramesRemaining <= 0) {
+    return;
+  }
+
+  const target = getEliminationTarget();
+  if (!target) {
+    return;
+  }
+
+  const elapsedFrames = ELIMINATION_SPIN_FRAMES - state.eliminationFramesRemaining;
+  const progress = clamp(elapsedFrames / ELIMINATION_SPIN_FRAMES, 0, 1);
+  const rotation = progress * Math.PI * 7;
+  const centerX = target.entity.x + target.entity.w * 0.5;
+  const centerY = target.entity.y + target.entity.h * 0.5;
+  const size = Math.max(target.entity.w, target.entity.h) + 56;
+
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.rotate(rotation);
+  ctx.globalAlpha = 0.86;
+
+  if (spiralImageLoaded) {
+    ctx.drawImage(spiralImage, -size / 2, -size / 2, size, size);
+  } else {
+    drawFallbackSpiral(size * 0.45);
+  }
+
+  ctx.restore();
+}
+
 function drawTokenIcon() {
   const holder = getCurrentTokenHolder();
+  if (!holder) {
+    return;
+  }
+
   const markerSize = 30;
   const x = holder.entity.x + holder.entity.w * 0.5 - markerSize * 0.5;
   const y = holder.entity.y - markerSize - 10;
@@ -688,6 +1004,10 @@ function drawTokenIcon() {
 }
 
 function drawPlayer() {
+  if (!player.alive) {
+    return;
+  }
+
   ctx.fillStyle = "#2f55c6";
   ctx.fillRect(player.x, player.y, player.w, player.h);
   ctx.fillStyle = "#89b4ff";
@@ -706,7 +1026,14 @@ function drawTextCenter(y, text, size = 36, color = "#f7f9ff") {
 }
 
 function drawOverlay() {
-  return;
+  if (state.mode !== "finished") {
+    return;
+  }
+
+  ctx.fillStyle = "rgba(6, 10, 28, 0.45)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  drawTextCenter(canvas.height * 0.42, `${getWinnerLabel()} wins!`, 44, "#f4f6ff");
+  drawTextCenter(canvas.height * 0.53, "Press R to reset arena", 28, "#d9ddf6");
 }
 
 function drawIntroHint() {
@@ -731,6 +1058,7 @@ function draw() {
   drawWalls();
   drawPlatforms();
   drawHazards();
+  drawEliminationSpiral();
   drawBots();
   drawPlayer();
   drawTokenIcon();
