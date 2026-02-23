@@ -614,10 +614,6 @@ function checkHazards() {
   return;
 }
 
-function checkGoal() {
-  return;
-}
-
 function updateCamera() {
   const target = player.y - canvas.height * CAMERA_FOLLOW_Y;
   cameraY = clamp(target, 0, WORLD.height - canvas.height);
@@ -632,7 +628,6 @@ function update() {
   updateBots();
   updateTokenTransfer();
   checkHazards();
-  checkGoal();
   updateCamera();
 
   if (introHintFrames > 0) {
@@ -693,10 +688,6 @@ function drawPlatforms() {
 }
 
 function drawHazards() {
-  return;
-}
-
-function drawGoal() {
   return;
 }
 
@@ -784,7 +775,6 @@ function draw() {
   drawPlatforms();
   drawHazards();
   drawBots();
-  drawGoal();
   drawPlayer();
   drawTokenIcon();
   ctx.restore();
