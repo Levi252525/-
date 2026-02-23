@@ -5,7 +5,7 @@ const hudStatus = document.getElementById("hud-status");
 
 const WORLD = {
   width: 960,
-  height: 1500,
+  height: 860,
 };
 
 const WALL_THICKNESS = 30;
@@ -29,47 +29,24 @@ let playerJumpSignalId = 0;
 let playerJumpSignalVy = 0;
 
 function buildPlatforms() {
-  const list = [
-    { x: WALL_THICKNESS + 145, y: WORLD.height - 120, w: 250, h: 18 },
-    { x: WORLD.width - WALL_THICKNESS - 315, y: WORLD.height - 220, w: 210, h: 16 },
-    { x: WALL_THICKNESS + 110, y: WORLD.height - 315, w: 170, h: 16 },
+  return [
+    { x: WALL_THICKNESS + 75, y: WORLD.height - 128, w: 225, h: 18 },
+    { x: WORLD.width - WALL_THICKNESS - 300, y: WORLD.height - 128, w: 225, h: 18 },
+    { x: WORLD.width / 2 - 115, y: WORLD.height - 218, w: 230, h: 16 },
+    { x: WALL_THICKNESS + 170, y: WORLD.height - 315, w: 190, h: 16 },
+    { x: WORLD.width - WALL_THICKNESS - 360, y: WORLD.height - 315, w: 190, h: 16 },
+    { x: WORLD.width / 2 - 95, y: WORLD.height - 405, w: 190, h: 16 },
+    {
+      x: WALL_THICKNESS,
+      y: WORLD.height - 32,
+      w: WORLD.width - WALL_THICKNESS * 2,
+      h: 32,
+    },
   ];
-
-  let y = WORLD.height - 410;
-  for (let i = 0; i < 10; i += 1) {
-    const width = i % 5 === 4 ? 200 : 160;
-    let x;
-
-    if (i % 3 === 0) {
-      x = WALL_THICKNESS + 78 + (i % 2) * 30;
-    } else if (i % 3 === 1) {
-      x = WORLD.width - WALL_THICKNESS - width - 78 - ((i + 1) % 2) * 24;
-    } else {
-      x = WORLD.width / 2 - width / 2 + (i % 2 === 0 ? -62 : 62);
-    }
-
-    list.push({ x, y, w: width, h: 16 });
-    y -= 94;
-  }
-
-  list.push({ x: WORLD.width / 2 - 120, y: 130, w: 240, h: 16 });
-  list.push({
-    x: WALL_THICKNESS,
-    y: WORLD.height - 32,
-    w: WORLD.width - WALL_THICKNESS * 2,
-    h: 32,
-  });
-  return list;
 }
 
 const platforms = buildPlatforms();
-
-function buildHazards() {
-  return [];
-}
-
-const hazards = buildHazards();
-const goal = { x: WORLD.width / 2 - 30, y: 68, w: 60, h: 88 };
+const hazards = [];
 
 const playerSpawn = {
   x: platforms[0].x + platforms[0].w / 2 - PLAYER_WIDTH / 2,
@@ -93,17 +70,21 @@ const player = {
 };
 
 function createBot(index) {
-  const laneWidth = WORLD.width - WALL_THICKNESS * 2 - 80;
-  const width = 12 + (index % 5) * 2;
-  const height = 34 + ((index * 7) % 6) * 5;
-  const spawnFloorY = playerSpawn.y + PLAYER_HEIGHT;
-  const tintHue = (index * 31 + 40) % 360;
-  const tintSat = 58 + (index % 4) * 10;
-  const tintLight = 42 + ((index * 5) % 4) * 8;
+  const width = 14 + index * 2;
+  const height = 40 + index * 4;
+  const spawnSlots = [
+    platforms[0].x + 20,
+    WORLD.width / 2 - width / 2,
+    platforms[1].x + platforms[1].w - width - 20,
+  ];
+  const tintHue = (index * 37 + 40) % 360;
+  const tintSat = 58 + (index % 3) * 12;
+  const tintLight = 46 + (index % 3) * 8;
+
   return {
     id: index,
-    x: WALL_THICKNESS + 40 + ((index * 47) % laneWidth),
-    y: spawnFloorY - height - (index % 5) * 10,
+    x: clamp(spawnSlots[index % spawnSlots.length], WALL_THICKNESS, WORLD.width - WALL_THICKNESS - width),
+    y: platforms[0].y - height,
     w: width,
     h: height,
     vx: 0,
@@ -111,8 +92,8 @@ function createBot(index) {
     onGround: false,
     maxJumps: 3,
     jumpsUsed: 0,
-    maxSpeed: 5.7 - width * 0.045,
-    jumpStrength: 11.2 + (height - 34) * 0.06,
+    maxSpeed: 5.8 - width * 0.04,
+    jumpStrength: 11.3 + (height - 40) * 0.06,
     jumpCooldown: 0,
     copyJumpLag: 0,
     copyJumpTimer: 0,
@@ -188,6 +169,10 @@ function intersects(a, b) {
   );
 }
 
+function getEntityCenterX(entity) {
+  return entity.x + entity.w * 0.5;
+}
+
 function getParticipants() {
   const participants = [{ type: "player", botId: -1, entity: player }];
   for (const bot of bots) {
@@ -215,8 +200,8 @@ function setTokenHolder(type, botId) {
 
 function assignRandomTokenHolder() {
   const participants = getParticipants();
-  const randomParticipant = participants[Math.floor(Math.random() * participants.length)];
-  setTokenHolder(randomParticipant.type, randomParticipant.botId);
+  const selected = participants[Math.floor(Math.random() * participants.length)];
+  setTokenHolder(selected.type, selected.botId);
 }
 
 function updateTokenTransfer() {
@@ -269,7 +254,7 @@ function resetGame() {
   resetPlayerToSpawn();
   resetBots();
   assignRandomTokenHolder();
-  hudStatus.textContent = "No score / no checkpoints - tag mode (holder chases, others flee you)";
+  hudStatus.textContent = "No score / no checkpoints - endless arena tag";
 }
 
 function resolveHorizontalCollisions(entity, solids) {
@@ -372,10 +357,6 @@ function updatePlayer() {
   }
 }
 
-function getEntityCenterX(entity) {
-  return entity.x + entity.w * 0.5;
-}
-
 function getBotBehavior(bot) {
   const holder = getCurrentTokenHolder();
   if (holder.type === "bot" && holder.botId === bot.id) {
@@ -384,7 +365,7 @@ function getBotBehavior(bot) {
 
     if (bot.chaseRetargetTimer <= 0) {
       bot.prefersPlayerTarget = nonPlayerTargets.length === 0 ? true : Math.random() < 0.75;
-      bot.chaseRetargetTimer = 18 + Math.floor(Math.random() * 18);
+      bot.chaseRetargetTimer = 24;
     } else {
       bot.chaseRetargetTimer -= 1;
     }
@@ -417,7 +398,6 @@ function getBotBehavior(bot) {
   const dyToPlayer = player.y - bot.y;
   const distToPlayer = dxToPlayer * dxToPlayer + dyToPlayer * dyToPlayer;
 
-  // Prefer treating the player as a threat when distances are close.
   const threatEntity = distToPlayer <= distToHolder * 1.15 ? player : holderEntity;
   return { mode: "flee", targetEntity: threatEntity };
 }
@@ -425,7 +405,7 @@ function getBotBehavior(bot) {
 function chooseBotTargetPlatform(bot, focusEntity, mode) {
   const focusCenterX = getEntityCenterX(focusEntity);
   const botCenterX = getEntityCenterX(bot);
-  const focusAbove = focusEntity.y < bot.y - 16;
+  const focusAbove = focusEntity.y < bot.y - 14;
   const fleeDirection = Math.sign(botCenterX - focusCenterX) || (botCenterX < WORLD.width * 0.5 ? -1 : 1);
 
   let best = null;
@@ -433,7 +413,6 @@ function chooseBotTargetPlatform(bot, focusEntity, mode) {
 
   for (const platform of platforms) {
     if (platform.h > 24) {
-      // Ignore the floor platform when choosing climb targets.
       continue;
     }
 
@@ -443,7 +422,7 @@ function chooseBotTargetPlatform(bot, focusEntity, mode) {
     }
 
     const verticalGap = Math.abs(platform.y - bot.y);
-    if (verticalGap > 230) {
+    if (verticalGap > 200) {
       continue;
     }
 
@@ -455,7 +434,7 @@ function chooseBotTargetPlatform(bot, focusEntity, mode) {
           : platform.x + 8;
 
     const distanceToAim = Math.abs(aimX - botCenterX);
-    if (distanceToAim > 340) {
+    if (distanceToAim > 300) {
       continue;
     }
 
@@ -463,8 +442,8 @@ function chooseBotTargetPlatform(bot, focusEntity, mode) {
     const distanceFromFocus = Math.abs(aimX - focusCenterX);
     const score =
       mode === "chase"
-        ? distanceToAim * 0.58 + verticalGap * 0.42 + verticalToFocus * 0.52
-        : distanceToAim * 0.48 + verticalGap * 0.27 - distanceFromFocus * 0.95 + verticalToFocus * 0.12;
+        ? distanceToAim * 0.65 + verticalGap * 0.4 + verticalToFocus * 0.45
+        : distanceToAim * 0.45 + verticalGap * 0.22 - distanceFromFocus * 0.9 + verticalToFocus * 0.08;
 
     if (score < bestScore) {
       bestScore = score;
@@ -486,7 +465,7 @@ function placeBotNearEntity(bot, targetEntity) {
 
     const closeHorizontally =
       targetCenterX >= platform.x - 45 && targetCenterX <= platform.x + platform.w + 45;
-    const closeVertically = platform.y >= targetEntity.y - 50;
+    const closeVertically = platform.y >= targetEntity.y - 60;
     if (!closeHorizontally || !closeVertically) {
       continue;
     }
@@ -496,7 +475,7 @@ function placeBotNearEntity(bot, targetEntity) {
     }
   }
 
-  const laneOffset = (bot.id - Math.floor(BOT_COUNT / 2)) * 30;
+  const laneOffset = (bot.id - 1) * 28;
   bot.x = clamp(
     targetCenterX - bot.w * 0.5 + laneOffset,
     WALL_THICKNESS,
@@ -506,7 +485,7 @@ function placeBotNearEntity(bot, targetEntity) {
   if (landingPlatform) {
     bot.y = landingPlatform.y - bot.h;
   } else {
-    bot.y = clamp(targetEntity.y + 20, 0, WORLD.height - bot.h);
+    bot.y = clamp(targetEntity.y + 18, 0, WORLD.height - bot.h);
   }
 
   bot.vx = 0;
@@ -519,18 +498,20 @@ function placeBotNearEntity(bot, targetEntity) {
 }
 
 function updateSingleBot(bot) {
-  const acceleration = 0.58;
-  const friction = 0.9;
   const behavior = getBotBehavior(bot);
   const focusEntity = behavior.targetEntity;
   const focusCenterX = getEntityCenterX(focusEntity);
   const botCenterX = getEntityCenterX(bot);
   const target = chooseBotTargetPlatform(bot, focusEntity, behavior.mode);
   let targetX = target ? target.aimX : focusCenterX;
+
   if (behavior.mode === "flee" && !target) {
     const fleeDirection = Math.sign(botCenterX - focusCenterX) || (botCenterX < WORLD.width * 0.5 ? -1 : 1);
-    targetX = botCenterX + fleeDirection * 220;
+    targetX = botCenterX + fleeDirection * 210;
   }
+
+  const acceleration = behavior.mode === "chase" ? 0.58 : 0.64;
+  const friction = 0.88;
 
   let intentX = Math.sign(targetX - botCenterX);
   if (Math.abs(targetX - botCenterX) < 3) {
@@ -543,9 +524,9 @@ function updateSingleBot(bot) {
     bot.vx *= friction;
   }
 
-  const chaseDistanceX = Math.abs(targetX - botCenterX);
+  const distanceToTargetX = Math.abs(targetX - botCenterX);
   const dynamicMaxSpeed =
-    bot.maxSpeed + (behavior.mode === "chase" ? (chaseDistanceX > 140 ? 1.7 : 0.7) : chaseDistanceX > 140 ? 1.5 : 0.5);
+    bot.maxSpeed + (behavior.mode === "chase" ? (distanceToTargetX > 120 ? 1.8 : 0.75) : distanceToTargetX > 120 ? 1.6 : 0.6);
   bot.vx = clamp(bot.vx, -dynamicMaxSpeed, dynamicMaxSpeed);
   if (Math.abs(bot.vx) < 0.03) {
     bot.vx = 0;
@@ -564,16 +545,16 @@ function updateSingleBot(bot) {
     if (bot.copyJumpTimer > 0) {
       bot.copyJumpTimer -= 1;
     } else {
-      if (bot.jumpsUsed < bot.maxJumps) {
+      if (bot.jumpsUsed < bot.maxJumps && bot.jumpCooldown <= 0) {
         const copiedStrength = clamp(
           Math.abs(playerJumpSignalVy),
-          Math.max(8.6, bot.jumpStrength - 1.2),
-          bot.jumpStrength + 1.8
+          Math.max(8.4, bot.jumpStrength - 1.3),
+          bot.jumpStrength + 1.6
         );
         bot.vy = -copiedStrength;
         bot.onGround = false;
         bot.jumpsUsed += 1;
-        bot.jumpCooldown = 5;
+        bot.jumpCooldown = 6;
       }
 
       bot.lastCopiedJumpId = bot.queuedJumpId;
@@ -581,16 +562,16 @@ function updateSingleBot(bot) {
     }
   }
 
-  const focusAboveBot = focusEntity.y < bot.y - 28;
-  const focusNearX = Math.abs(focusCenterX - botCenterX) < 115;
+  const focusAboveBot = focusEntity.y < bot.y - 24;
+  const focusNearX = Math.abs(focusCenterX - botCenterX) < 110;
   if (bot.onGround && bot.jumpCooldown <= 0 && bot.queuedJumpId === 0 && (focusAboveBot || behavior.mode === "flee" && focusNearX)) {
-    bot.vy = -(bot.jumpStrength + 0.5);
+    bot.vy = -(bot.jumpStrength + 0.45);
     bot.onGround = false;
     bot.jumpsUsed = 1;
     bot.jumpCooldown = 8;
   } else if (!bot.onGround && bot.jumpCooldown <= 0 && bot.jumpsUsed < bot.maxJumps) {
     const shouldAirJump = behavior.mode === "chase" ? focusAboveBot : focusNearX;
-    if (shouldAirJump && bot.vy > -0.6) {
+    if (shouldAirJump && bot.vy > -0.75) {
       bot.vy = -(bot.jumpStrength - 0.6);
       bot.jumpsUsed += 1;
       bot.jumpCooldown = 8;
@@ -613,12 +594,12 @@ function updateSingleBot(bot) {
 
   const xDistance = Math.abs(focusCenterX - getEntityCenterX(bot));
   const yDistance = Math.abs(focusEntity.y - bot.y);
-  if (xDistance > 430 || yDistance > 420) {
+  if (xDistance > 300 || yDistance > 260) {
     placeBotNearEntity(bot, focusEntity);
     return;
   }
 
-  if (bot.y > WORLD.height + 220) {
+  if (bot.y > WORLD.height + 160) {
     placeBotNearEntity(bot, focusEntity);
   }
 }
@@ -634,11 +615,7 @@ function checkHazards() {
 }
 
 function checkGoal() {
-  if (!intersects(player, goal) || state.mode !== "playing") {
-    return;
-  }
-
-  state.mode = "won";
+  return;
 }
 
 function updateCamera() {
@@ -648,9 +625,6 @@ function updateCamera() {
 
 function update() {
   if (state.mode !== "playing") {
-    if (introHintFrames > 0) {
-      introHintFrames -= 1;
-    }
     return;
   }
 
@@ -675,26 +649,11 @@ function drawBackground() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
-  for (let i = 0; i < 32; i += 1) {
-    const x = ((i * 83) % canvas.width) + ((i % 5) - 2) * 3;
-    const y = ((i * 141 + Math.floor(cameraY * 0.35)) % canvas.height) - 16;
+  for (let i = 0; i < 26; i += 1) {
+    const x = ((i * 109) % canvas.width) + ((i % 5) - 2) * 3;
+    const y = ((i * 87 + Math.floor(cameraY * 0.33)) % canvas.height) - 16;
     ctx.fillRect(x, y, 2, 2);
   }
-
-  ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
-  for (let i = 0; i < 6; i += 1) {
-    const cloudX = ((i * 170 + Math.floor(cameraY * 0.18)) % (canvas.width + 180)) - 100;
-    const cloudY = 58 + i * 62;
-    drawCloud(cloudX, cloudY, 1 + (i % 2) * 0.28);
-  }
-}
-
-function drawCloud(x, y, scale) {
-  ctx.beginPath();
-  ctx.arc(x, y, 18 * scale, 0, Math.PI * 2);
-  ctx.arc(x + 18 * scale, y - 8 * scale, 14 * scale, 0, Math.PI * 2);
-  ctx.arc(x + 38 * scale, y - 2 * scale, 16 * scale, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 function drawWalls() {
@@ -738,18 +697,7 @@ function drawHazards() {
 }
 
 function drawGoal() {
-  const pulse = 0.6 + Math.sin(performance.now() * 0.008) * 0.25;
-  ctx.fillStyle = "#0f2144";
-  ctx.fillRect(goal.x + goal.w - 8, goal.y, 8, goal.h);
-  ctx.fillStyle = "#84ffe5";
-  ctx.globalAlpha = pulse;
-  ctx.beginPath();
-  ctx.moveTo(goal.x + 4, goal.y + 13);
-  ctx.lineTo(goal.x + goal.w - 8, goal.y + 24);
-  ctx.lineTo(goal.x + 4, goal.y + 35);
-  ctx.closePath();
-  ctx.fill();
-  ctx.globalAlpha = 1;
+  return;
 }
 
 function drawBots() {
@@ -810,21 +758,7 @@ function drawTextCenter(y, text, size = 36, color = "#f7f9ff") {
 }
 
 function drawOverlay() {
-  if (state.mode === "playing") {
-    return;
-  }
-
-  ctx.fillStyle = "rgba(7, 10, 24, 0.65)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  if (state.mode === "won") {
-    drawTextCenter(220, "Summit Reached!", 54, "#bafce2");
-    drawTextCenter(292, "Press R to play again", 24, "#d9deff");
-    return;
-  }
-
-  drawTextCenter(220, "Paused", 52, "#eef7ff");
-  drawTextCenter(292, "Press R to play", 24, "#d9deff");
+  return;
 }
 
 function drawIntroHint() {
@@ -834,11 +768,11 @@ function drawIntroHint() {
 
   const alpha = clamp(introHintFrames / 210, 0, 1);
   ctx.fillStyle = `rgba(8, 12, 33, ${0.45 * alpha})`;
-  ctx.fillRect(174, 20, 612, 42);
+  ctx.fillRect(164, 20, 632, 42);
   ctx.fillStyle = `rgba(247, 251, 255, ${alpha})`;
   ctx.font = '600 20px "Segoe UI", sans-serif';
   ctx.textAlign = "center";
-  ctx.fillText("Climb upward with double jump and reach the summit gate", canvas.width / 2, 48);
+  ctx.fillText("Endless arena tag: holder chases, others flee", canvas.width / 2, 48);
 }
 
 function draw() {
@@ -881,8 +815,9 @@ function keyDownHandler(event) {
     event.preventDefault();
   }
 
-  if (key === "r" && state.mode !== "playing") {
+  if (key === "r") {
     resetGame();
+    event.preventDefault();
   }
 }
 
