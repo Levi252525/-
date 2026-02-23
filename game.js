@@ -19,6 +19,18 @@ const TOKEN_TRANSFER_COOLDOWN = 14;
 const ROUND_TIMER_SECONDS = 20;
 const ROUND_DURATION_FRAMES = ROUND_TIMER_SECONDS * 60;
 const ELIMINATION_SPIN_FRAMES = 2 * 60;
+const BOT_DIFFICULTY = {
+  baseSpeedBoost: 1.45,
+  chaseAcceleration: 0.92,
+  fleeAcceleration: 0.98,
+  chaseBurstFar: 2.9,
+  chaseBurstNear: 1.4,
+  fleeBurstFar: 2.6,
+  fleeBurstNear: 1.15,
+  maxVerticalSearch: 235,
+  maxHorizontalSearch: 420,
+  predictionFrames: 18,
+};
 
 const keys = {
   left: false,
@@ -97,8 +109,8 @@ function createBot(index) {
     alive: true,
     maxJumps: 3,
     jumpsUsed: 0,
-    maxSpeed: 5.8 - width * 0.04,
-    jumpStrength: 11.3 + (height - 40) * 0.06,
+    maxSpeed: 6.9 - width * 0.03 + BOT_DIFFICULTY.baseSpeedBoost * 0.35,
+    jumpStrength: 12.6 + (height - 40) * 0.08,
     jumpCooldown: 0,
     copyJumpLag: 0,
     copyJumpTimer: 0,
@@ -208,6 +220,14 @@ function intersects(a, b) {
 
 function getEntityCenterX(entity) {
   return entity.x + entity.w * 0.5;
+}
+
+function getPredictedFocusX(focusEntity, mode) {
+  const centerX = getEntityCenterX(focusEntity);
+  const leadFrames = mode === "chase" ? BOT_DIFFICULTY.predictionFrames : 10;
+  const vx = typeof focusEntity.vx === "number" ? focusEntity.vx : 0;
+  const lead = clamp(vx * leadFrames, -155, 155);
+  return clamp(centerX + lead, WALL_THICKNESS + 8, WORLD.width - WALL_THICKNESS - 8);
 }
 
 function getParticipants() {
@@ -580,8 +600,8 @@ function getBotBehavior(bot) {
     const nonPlayerTargets = participants.filter((participant) => participant.type === "bot");
 
     if (bot.chaseRetargetTimer <= 0) {
-      bot.prefersPlayerTarget = playerTarget ? nonPlayerTargets.length === 0 || Math.random() < 0.75 : false;
-      bot.chaseRetargetTimer = 24;
+      bot.prefersPlayerTarget = playerTarget ? nonPlayerTargets.length === 0 || Math.random() < 0.92 : false;
+      bot.chaseRetargetTimer = 10;
     } else {
       bot.chaseRetargetTimer -= 1;
     }
@@ -624,7 +644,7 @@ function getBotBehavior(bot) {
 }
 
 function chooseBotTargetPlatform(bot, focusEntity, mode) {
-  const focusCenterX = getEntityCenterX(focusEntity);
+  const focusCenterX = getPredictedFocusX(focusEntity, mode);
   const botCenterX = getEntityCenterX(bot);
   const focusAbove = focusEntity.y < bot.y - 14;
   const fleeDirection = Math.sign(botCenterX - focusCenterX) || (botCenterX < WORLD.width * 0.5 ? -1 : 1);
@@ -643,7 +663,7 @@ function chooseBotTargetPlatform(bot, focusEntity, mode) {
     }
 
     const verticalGap = Math.abs(platform.y - bot.y);
-    if (verticalGap > 200) {
+    if (verticalGap > BOT_DIFFICULTY.maxVerticalSearch) {
       continue;
     }
 
@@ -655,7 +675,7 @@ function chooseBotTargetPlatform(bot, focusEntity, mode) {
           : platform.x + 8;
 
     const distanceToAim = Math.abs(aimX - botCenterX);
-    if (distanceToAim > 300) {
+    if (distanceToAim > BOT_DIFFICULTY.maxHorizontalSearch) {
       continue;
     }
 
@@ -663,8 +683,8 @@ function chooseBotTargetPlatform(bot, focusEntity, mode) {
     const distanceFromFocus = Math.abs(aimX - focusCenterX);
     const score =
       mode === "chase"
-        ? distanceToAim * 0.65 + verticalGap * 0.4 + verticalToFocus * 0.45
-        : distanceToAim * 0.45 + verticalGap * 0.22 - distanceFromFocus * 0.9 + verticalToFocus * 0.08;
+        ? distanceToAim * 0.52 + verticalGap * 0.34 + verticalToFocus * 0.28
+        : distanceToAim * 0.34 + verticalGap * 0.16 - distanceFromFocus * 1.2 + verticalToFocus * 0.04;
 
     if (score < bestScore) {
       bestScore = score;
@@ -680,16 +700,19 @@ function updateSingleBot(bot) {
   const focusEntity = behavior.targetEntity;
   const focusCenterX = getEntityCenterX(focusEntity);
   const botCenterX = getEntityCenterX(bot);
+  const predictedFocusX = getPredictedFocusX(focusEntity, behavior.mode);
   const target = chooseBotTargetPlatform(bot, focusEntity, behavior.mode);
-  let targetX = target ? target.aimX : focusCenterX;
+  let targetX = target ? target.aimX : predictedFocusX;
 
   if (behavior.mode === "flee" && !target) {
     const fleeDirection = Math.sign(botCenterX - focusCenterX) || (botCenterX < WORLD.width * 0.5 ? -1 : 1);
-    targetX = botCenterX + fleeDirection * 210;
+    targetX = botCenterX + fleeDirection * 250;
+  } else if (behavior.mode === "chase" && target) {
+    targetX = target.aimX * 0.62 + predictedFocusX * 0.38;
   }
 
-  const acceleration = behavior.mode === "chase" ? 0.58 : 0.64;
-  const friction = 0.88;
+  const acceleration = behavior.mode === "chase" ? BOT_DIFFICULTY.chaseAcceleration : BOT_DIFFICULTY.fleeAcceleration;
+  const friction = 0.9;
 
   let intentX = Math.sign(targetX - botCenterX);
   if (Math.abs(targetX - botCenterX) < 3) {
@@ -702,16 +725,36 @@ function updateSingleBot(bot) {
     bot.vx *= friction;
   }
 
+  if (behavior.mode === "chase" && intentX !== 0 && Math.abs(bot.vx) < 1.3) {
+    bot.vx = intentX * 1.3;
+  }
+
   const distanceToTargetX = Math.abs(targetX - botCenterX);
-  const dynamicMaxSpeed =
-    bot.maxSpeed + (behavior.mode === "chase" ? (distanceToTargetX > 120 ? 1.8 : 0.75) : distanceToTargetX > 120 ? 1.6 : 0.6);
+  let dynamicMaxSpeed =
+    bot.maxSpeed +
+    (behavior.mode === "chase"
+      ? distanceToTargetX > 120
+        ? BOT_DIFFICULTY.chaseBurstFar
+        : BOT_DIFFICULTY.chaseBurstNear
+      : distanceToTargetX > 120
+        ? BOT_DIFFICULTY.fleeBurstFar
+        : BOT_DIFFICULTY.fleeBurstNear);
+
+  if (behavior.mode === "chase" && focusEntity === player) {
+    dynamicMaxSpeed += 0.7;
+  }
+
+  if (behavior.mode === "flee" && focusEntity === player) {
+    dynamicMaxSpeed += 0.55;
+  }
+
   bot.vx = clamp(bot.vx, -dynamicMaxSpeed, dynamicMaxSpeed);
   if (Math.abs(bot.vx) < 0.03) {
     bot.vx = 0;
   }
 
   if (bot.jumpCooldown > 0) {
-    bot.jumpCooldown -= 1;
+    bot.jumpCooldown = Math.max(0, bot.jumpCooldown - 1.2);
   }
 
   if (bot.lastCopiedJumpId < playerJumpSignalId && bot.queuedJumpId !== playerJumpSignalId) {
@@ -732,7 +775,7 @@ function updateSingleBot(bot) {
         bot.vy = -copiedStrength;
         bot.onGround = false;
         bot.jumpsUsed += 1;
-        bot.jumpCooldown = 6;
+        bot.jumpCooldown = 4;
       }
 
       bot.lastCopiedJumpId = bot.queuedJumpId;
@@ -742,17 +785,23 @@ function updateSingleBot(bot) {
 
   const focusAboveBot = focusEntity.y < bot.y - 24;
   const focusNearX = Math.abs(focusCenterX - botCenterX) < 110;
-  if (bot.onGround && bot.jumpCooldown <= 0 && bot.queuedJumpId === 0 && (focusAboveBot || behavior.mode === "flee" && focusNearX)) {
+  const verticalDelta = focusEntity.y - bot.y;
+  const chaseNeedsLift = behavior.mode === "chase" && (focusAboveBot || Math.abs(verticalDelta) > 20);
+  const fleeNeedsLift = behavior.mode === "flee" && (focusNearX || Math.abs(verticalDelta) < 72);
+  if (bot.onGround && bot.jumpCooldown <= 0 && bot.queuedJumpId === 0 && (chaseNeedsLift || fleeNeedsLift)) {
     bot.vy = -(bot.jumpStrength + 0.45);
     bot.onGround = false;
     bot.jumpsUsed = 1;
-    bot.jumpCooldown = 8;
+    bot.jumpCooldown = 6;
   } else if (!bot.onGround && bot.jumpCooldown <= 0 && bot.jumpsUsed < bot.maxJumps) {
-    const shouldAirJump = behavior.mode === "chase" ? focusAboveBot : focusNearX;
-    if (shouldAirJump && bot.vy > -0.75) {
+    const shouldAirJump =
+      behavior.mode === "chase"
+        ? verticalDelta < -16 || Math.abs(targetX - botCenterX) > 72
+        : focusNearX || verticalDelta < -20;
+    if (shouldAirJump && bot.vy > -2.4) {
       bot.vy = -(bot.jumpStrength - 0.6);
       bot.jumpsUsed += 1;
-      bot.jumpCooldown = 8;
+      bot.jumpCooldown = 6;
     }
   }
 
