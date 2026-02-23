@@ -4,11 +4,12 @@ A small browser platformer built with plain HTML, CSS, and JavaScript.
 
 ## Objective
 
-Climb upward by jumping from platform to platform and reach the glowing summit gate near the top.
+Play an endless short arena in tag mode. The picture holder chases while everyone else tries to run.
 
 The level includes:
 
 - Side wall barriers on both sides of the tower
+- Super short arena layout with only a few platforms
 - No spike hazards and a safe floor at the bottom
 - Platform textures loaded from your downloaded image assets (`image-removebg-preview (1).png` first, with fallbacks)
 - Double jump movement (you can jump once more while airborne)
@@ -28,9 +29,9 @@ The level includes:
 
 Open `index.html` in a browser.
 
-For Chromebook/offline use, open the single-file build directly:
+For Chromebook/offline use, open this alternate launcher:
 
-- `game.html` (no local server required)
+- `game.html`
 
 If you prefer serving it from a local web server:
 
