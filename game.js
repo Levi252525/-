@@ -56,7 +56,6 @@ function buildPlatforms() {
     { x: WORLD.width / 2 - 115, y: WORLD.height - 218, w: 230, h: 16 },
     { x: WALL_THICKNESS + 170, y: WORLD.height - 315, w: 190, h: 16 },
     { x: WORLD.width - WALL_THICKNESS - 360, y: WORLD.height - 315, w: 190, h: 16 },
-    { x: WORLD.width / 2 - 95, y: WORLD.height - 405, w: 190, h: 16 },
     {
       x: WALL_THICKNESS,
       y: WORLD.height - 32,
@@ -73,11 +72,10 @@ function buildBouncePads() {
   const padWidth = 62;
   const padHeight = 8;
   const floor = platforms[platforms.length - 1];
-  const edgeInset = 26;
 
   return [
-    { id: 0, x: floor.x + edgeInset, y: floor.y, w: padWidth, h: padHeight, flashFrames: 0 },
-    { id: 1, x: floor.x + floor.w - padWidth - edgeInset, y: floor.y, w: padWidth, h: padHeight, flashFrames: 0 },
+    { id: 0, x: floor.x, y: floor.y, w: padWidth, h: padHeight, flashFrames: 0 },
+    { id: 1, x: floor.x + floor.w - padWidth, y: floor.y, w: padWidth, h: padHeight, flashFrames: 0 },
   ];
 }
 
@@ -1150,13 +1148,13 @@ function drawBouncePads() {
   for (const pad of bouncePads) {
     const flash = pad.flashFrames / 10;
     if (flash > 0) {
-      ctx.fillStyle = `rgba(193, 129, 255, ${0.22 + flash * 0.44})`;
+      ctx.fillStyle = `rgba(255, 175, 74, ${0.24 + flash * 0.44})`;
       ctx.fillRect(pad.x - 6, pad.y - 10, pad.w + 12, pad.h + 14);
     }
 
-    ctx.fillStyle = "#6d45e6";
+    ctx.fillStyle = "#eb7e1e";
     ctx.fillRect(pad.x, pad.y - 5, pad.w, pad.h);
-    ctx.fillStyle = "#d8c9ff";
+    ctx.fillStyle = "#ffd59e";
     ctx.fillRect(pad.x + 6, pad.y - 3, pad.w - 12, 3);
   }
 }
