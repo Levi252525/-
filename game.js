@@ -454,49 +454,6 @@ function chooseBotTargetPlatform(bot, focusEntity, mode) {
   return best;
 }
 
-function placeBotNearEntity(bot, targetEntity) {
-  const targetCenterX = getEntityCenterX(targetEntity);
-  let landingPlatform = null;
-
-  for (const platform of platforms) {
-    if (platform.h > 24) {
-      continue;
-    }
-
-    const closeHorizontally =
-      targetCenterX >= platform.x - 45 && targetCenterX <= platform.x + platform.w + 45;
-    const closeVertically = platform.y >= targetEntity.y - 60;
-    if (!closeHorizontally || !closeVertically) {
-      continue;
-    }
-
-    if (!landingPlatform || platform.y < landingPlatform.y) {
-      landingPlatform = platform;
-    }
-  }
-
-  const laneOffset = (bot.id - 1) * 28;
-  bot.x = clamp(
-    targetCenterX - bot.w * 0.5 + laneOffset,
-    WALL_THICKNESS,
-    WORLD.width - WALL_THICKNESS - bot.w
-  );
-
-  if (landingPlatform) {
-    bot.y = landingPlatform.y - bot.h;
-  } else {
-    bot.y = clamp(targetEntity.y + 18, 0, WORLD.height - bot.h);
-  }
-
-  bot.vx = 0;
-  bot.vy = 0;
-  bot.onGround = true;
-  bot.jumpsUsed = 0;
-  bot.jumpCooldown = 6;
-  bot.queuedJumpId = 0;
-  bot.copyJumpTimer = 0;
-}
-
 function updateSingleBot(bot) {
   const behavior = getBotBehavior(bot);
   const focusEntity = behavior.targetEntity;
@@ -592,15 +549,15 @@ function updateSingleBot(bot) {
     bot.vy = 0;
   }
 
-  const xDistance = Math.abs(focusCenterX - getEntityCenterX(bot));
-  const yDistance = Math.abs(focusEntity.y - bot.y);
-  if (xDistance > 300 || yDistance > 260) {
-    placeBotNearEntity(bot, focusEntity);
-    return;
-  }
-
   if (bot.y > WORLD.height + 160) {
-    placeBotNearEntity(bot, focusEntity);
+    const floor = platforms[platforms.length - 1];
+    bot.x = clamp(bot.x, WALL_THICKNESS, WORLD.width - WALL_THICKNESS - bot.w);
+    bot.y = floor.y - bot.h;
+    bot.vx = 0;
+    bot.vy = 0;
+    bot.onGround = true;
+    bot.jumpsUsed = 0;
+    bot.jumpCooldown = 6;
   }
 }
 
@@ -611,10 +568,6 @@ function updateBots() {
 }
 
 function checkHazards() {
-  return;
-}
-
-function checkGoal() {
   return;
 }
 
@@ -632,7 +585,6 @@ function update() {
   updateBots();
   updateTokenTransfer();
   checkHazards();
-  checkGoal();
   updateCamera();
 
   if (introHintFrames > 0) {
@@ -693,10 +645,6 @@ function drawPlatforms() {
 }
 
 function drawHazards() {
-  return;
-}
-
-function drawGoal() {
   return;
 }
 
@@ -784,7 +732,6 @@ function draw() {
   drawPlatforms();
   drawHazards();
   drawBots();
-  drawGoal();
   drawPlayer();
   drawTokenIcon();
   ctx.restore();

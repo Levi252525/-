@@ -23,7 +23,7 @@ The level includes:
 
 - **A / D** or **Left / Right Arrow**: move
 - **W / Up Arrow / Space**: jump (double jump enabled)
-- **R**: restart after win/loss
+- **R**: reset arena
 
 ## Run locally
 
