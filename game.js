@@ -19,6 +19,12 @@ const TOKEN_TRANSFER_COOLDOWN = 14;
 const ROUND_TIMER_SECONDS = 20;
 const ROUND_DURATION_FRAMES = ROUND_TIMER_SECONDS * 60;
 const ELIMINATION_SPIN_FRAMES = 2 * 60;
+const BOUNCE_PAD_COOLDOWN_FRAMES = 14;
+const BOUNCE_PAD_PLAYER_STRENGTH = 19.4;
+const BOUNCE_PAD_BOT_STRENGTH = 18.4;
+const POWER_UP_DURATION_FRAMES = 8 * 60;
+const POWER_UP_RESPAWN_MIN_FRAMES = 6 * 60;
+const POWER_UP_RESPAWN_MAX_FRAMES = 11 * 60;
 const BOT_DIFFICULTY = {
   baseSpeedBoost: 1.45,
   chaseAcceleration: 0.92,
@@ -63,6 +69,30 @@ function buildPlatforms() {
 const platforms = buildPlatforms();
 const hazards = [];
 
+function buildBouncePads() {
+  const padWidth = 62;
+  const padHeight = 8;
+
+  return [
+    { id: 0, x: platforms[0].x + platforms[0].w * 0.5 - padWidth * 0.5, y: platforms[0].y, w: padWidth, h: padHeight, flashFrames: 0 },
+    { id: 1, x: platforms[1].x + platforms[1].w * 0.5 - padWidth * 0.5, y: platforms[1].y, w: padWidth, h: padHeight, flashFrames: 0 },
+    { id: 2, x: platforms[2].x + platforms[2].w * 0.5 - padWidth * 0.5, y: platforms[2].y, w: padWidth, h: padHeight, flashFrames: 0 },
+    { id: 3, x: platforms[5].x + platforms[5].w * 0.5 - padWidth * 0.5, y: platforms[5].y, w: padWidth, h: padHeight, flashFrames: 0 },
+  ];
+}
+
+function buildPowerUps() {
+  const size = 24;
+  return [
+    { id: 0, type: "speed", x: platforms[3].x + platforms[3].w * 0.5 - size * 0.5, y: platforms[3].y - 44, w: size, h: size, active: true, respawnFrames: 0, bobPhase: 0 },
+    { id: 1, type: "jump", x: platforms[4].x + platforms[4].w * 0.5 - size * 0.5, y: platforms[4].y - 44, w: size, h: size, active: true, respawnFrames: 0, bobPhase: Math.PI * 0.6 },
+    { id: 2, type: "speed", x: platforms[2].x + platforms[2].w * 0.5 - size * 0.5, y: platforms[2].y - 48, w: size, h: size, active: true, respawnFrames: 0, bobPhase: Math.PI * 1.1 },
+  ];
+}
+
+const bouncePads = buildBouncePads();
+const powerUps = buildPowerUps();
+
 const playerSpawn = {
   x: platforms[0].x + platforms[0].w / 2 - PLAYER_WIDTH / 2,
   y: platforms[0].y - 50,
@@ -83,6 +113,9 @@ const player = {
   spawnX: playerSpawn.x,
   spawnY: playerSpawn.y,
   alive: true,
+  speedBoostFrames: 0,
+  jumpBoostFrames: 0,
+  padCooldown: 0,
 };
 
 function createBot(index) {
@@ -118,6 +151,9 @@ function createBot(index) {
     lastCopiedJumpId: 0,
     chaseRetargetTimer: 0,
     prefersPlayerTarget: true,
+    speedBoostFrames: 0,
+    jumpBoostFrames: 0,
+    padCooldown: 0,
     tintHue,
     tintSat,
     tintLight,
@@ -228,6 +264,145 @@ function getPredictedFocusX(focusEntity, mode) {
   const vx = typeof focusEntity.vx === "number" ? focusEntity.vx : 0;
   const lead = clamp(vx * leadFrames, -155, 155);
   return clamp(centerX + lead, WALL_THICKNESS + 8, WORLD.width - WALL_THICKNESS - 8);
+}
+
+function randomRangeInt(min, max) {
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+function getEntityMaxSpeed(entity) {
+  return entity.maxSpeed + (entity.speedBoostFrames > 0 ? 2.35 : 0);
+}
+
+function getEntityJumpStrength(entity) {
+  return entity.jumpStrength + (entity.jumpBoostFrames > 0 ? 3 : 0);
+}
+
+function updateEntityPowerTimers(entity) {
+  if (entity.speedBoostFrames > 0) {
+    entity.speedBoostFrames -= 1;
+  }
+
+  if (entity.jumpBoostFrames > 0) {
+    entity.jumpBoostFrames -= 1;
+  }
+
+  if (entity.padCooldown > 0) {
+    entity.padCooldown -= 1;
+  }
+}
+
+function getPowerUpY(powerUp) {
+  return powerUp.y + Math.sin(powerUp.bobPhase) * 4;
+}
+
+function applyPowerUp(entity, type) {
+  if (type === "speed") {
+    entity.speedBoostFrames = POWER_UP_DURATION_FRAMES;
+    return;
+  }
+
+  if (type === "jump") {
+    entity.jumpBoostFrames = POWER_UP_DURATION_FRAMES;
+  }
+}
+
+function resetPowerUps() {
+  for (const powerUp of powerUps) {
+    powerUp.active = true;
+    powerUp.respawnFrames = 0;
+    powerUp.bobPhase = (powerUp.id + 1) * 0.9;
+  }
+}
+
+function updatePowerUps() {
+  const participants = getParticipants();
+  if (participants.length === 0) {
+    return;
+  }
+
+  for (const powerUp of powerUps) {
+    powerUp.bobPhase += 0.07;
+
+    if (!powerUp.active) {
+      if (powerUp.respawnFrames > 0) {
+        powerUp.respawnFrames -= 1;
+      } else {
+        powerUp.active = true;
+      }
+      continue;
+    }
+
+    const pickup = {
+      x: powerUp.x,
+      y: getPowerUpY(powerUp),
+      w: powerUp.w,
+      h: powerUp.h,
+    };
+
+    for (const participant of participants) {
+      if (!intersects(participant.entity, pickup)) {
+        continue;
+      }
+
+      applyPowerUp(participant.entity, powerUp.type);
+      powerUp.active = false;
+      powerUp.respawnFrames = randomRangeInt(POWER_UP_RESPAWN_MIN_FRAMES, POWER_UP_RESPAWN_MAX_FRAMES);
+      break;
+    }
+  }
+}
+
+function updateBouncePads() {
+  for (const pad of bouncePads) {
+    if (pad.flashFrames > 0) {
+      pad.flashFrames -= 1;
+    }
+  }
+}
+
+function tryBounceFromPads(entity, launchStrength) {
+  if (entity.padCooldown > 0) {
+    return;
+  }
+
+  const centerX = getEntityCenterX(entity);
+  const feetY = entity.y + entity.h;
+  for (const pad of bouncePads) {
+    const insidePad = centerX >= pad.x + 6 && centerX <= pad.x + pad.w - 6;
+    if (!insidePad) {
+      continue;
+    }
+
+    const nearSurface = Math.abs(feetY - pad.y) <= 7;
+    if (!nearSurface || entity.vy < -1.2) {
+      continue;
+    }
+
+    entity.y = pad.y - entity.h - 0.01;
+    entity.vy = -launchStrength;
+    entity.onGround = false;
+    entity.jumpsUsed = 0;
+    entity.padCooldown = BOUNCE_PAD_COOLDOWN_FRAMES;
+    pad.flashFrames = 10;
+    return;
+  }
+}
+
+function getPlayerPowerUpLabel() {
+  if (!player.alive) {
+    return "Out";
+  }
+
+  const active = [];
+  if (player.speedBoostFrames > 0) {
+    active.push("Speed");
+  }
+  if (player.jumpBoostFrames > 0) {
+    active.push("Jump");
+  }
+
+  return active.length > 0 ? active.join("+") : "None";
 }
 
 function getParticipants() {
@@ -364,7 +539,8 @@ function updateHudStatus() {
 
   const holder = getCurrentTokenHolder();
   const secondsLeft = Math.ceil(state.roundFramesRemaining / 60);
-  hudStatus.textContent = `Timer: ${secondsLeft}s | Alive: ${aliveCount} | Holder: ${getHolderLabel(holder)}`;
+  hudStatus.textContent =
+    `Timer: ${secondsLeft}s | Alive: ${aliveCount} | Holder: ${getHolderLabel(holder)} | Power: ${getPlayerPowerUpLabel()}`;
 }
 
 function getEliminationTarget() {
@@ -382,6 +558,9 @@ function eliminateParticipant(participant) {
     player.vy = 0;
     player.onGround = false;
     player.jumpsUsed = 0;
+    player.speedBoostFrames = 0;
+    player.jumpBoostFrames = 0;
+    player.padCooldown = 0;
     keys.left = false;
     keys.right = false;
     return;
@@ -393,6 +572,9 @@ function eliminateParticipant(participant) {
   bot.vy = 0;
   bot.onGround = false;
   bot.jumpsUsed = 0;
+  bot.speedBoostFrames = 0;
+  bot.jumpBoostFrames = 0;
+  bot.padCooldown = 0;
 }
 
 function finishMatchIfNeeded() {
@@ -456,6 +638,9 @@ function resetPlayerToSpawn() {
   player.vy = 0;
   player.onGround = false;
   player.jumpsUsed = 0;
+  player.speedBoostFrames = 0;
+  player.jumpBoostFrames = 0;
+  player.padCooldown = 0;
   cameraY = WORLD.height - canvas.height;
 }
 
@@ -484,6 +669,7 @@ function resetGame() {
   playerJumpSignalVy = 0;
   resetPlayerToSpawn();
   resetBots();
+  resetPowerUps();
   assignRandomTokenHolder();
   updateHudStatus();
 }
@@ -538,8 +724,12 @@ function keepInsideWalls(entity) {
 }
 
 function updatePlayer() {
+  updateEntityPowerTimers(player);
+
   const acceleration = 0.72;
   const friction = 0.82;
+  const effectiveMaxSpeed = getEntityMaxSpeed(player);
+  const effectiveJumpStrength = getEntityJumpStrength(player);
 
   if (keys.left) {
     player.vx -= acceleration;
@@ -553,13 +743,13 @@ function updatePlayer() {
     player.vx *= friction;
   }
 
-  player.vx = clamp(player.vx, -player.maxSpeed, player.maxSpeed);
+  player.vx = clamp(player.vx, -effectiveMaxSpeed, effectiveMaxSpeed);
   if (Math.abs(player.vx) < 0.04) {
     player.vx = 0;
   }
 
   if (jumpRequested && player.jumpsUsed < player.maxJumps) {
-    player.vy = -player.jumpStrength;
+    player.vy = -effectiveJumpStrength;
     player.onGround = false;
     player.jumpsUsed += 1;
     emitPlayerJumpSignal(player.vy);
@@ -574,6 +764,7 @@ function updatePlayer() {
 
   player.y += player.vy;
   resolveVerticalCollisions(player, platforms);
+  tryBounceFromPads(player, BOUNCE_PAD_PLAYER_STRENGTH);
 
   if (player.y < 0) {
     player.y = 0;
@@ -696,11 +887,14 @@ function chooseBotTargetPlatform(bot, focusEntity, mode) {
 }
 
 function updateSingleBot(bot) {
+  updateEntityPowerTimers(bot);
+
   const behavior = getBotBehavior(bot);
   const focusEntity = behavior.targetEntity;
   const focusCenterX = getEntityCenterX(focusEntity);
   const botCenterX = getEntityCenterX(bot);
   const predictedFocusX = getPredictedFocusX(focusEntity, behavior.mode);
+  const effectiveJumpStrength = getEntityJumpStrength(bot);
   const target = chooseBotTargetPlatform(bot, focusEntity, behavior.mode);
   let targetX = target ? target.aimX : predictedFocusX;
 
@@ -731,7 +925,7 @@ function updateSingleBot(bot) {
 
   const distanceToTargetX = Math.abs(targetX - botCenterX);
   let dynamicMaxSpeed =
-    bot.maxSpeed +
+    getEntityMaxSpeed(bot) +
     (behavior.mode === "chase"
       ? distanceToTargetX > 120
         ? BOT_DIFFICULTY.chaseBurstFar
@@ -769,8 +963,8 @@ function updateSingleBot(bot) {
       if (bot.jumpsUsed < bot.maxJumps && bot.jumpCooldown <= 0) {
         const copiedStrength = clamp(
           Math.abs(playerJumpSignalVy),
-          Math.max(8.4, bot.jumpStrength - 1.3),
-          bot.jumpStrength + 1.6
+          Math.max(9.2, effectiveJumpStrength - 1.5),
+          effectiveJumpStrength + 1.8
         );
         bot.vy = -copiedStrength;
         bot.onGround = false;
@@ -789,7 +983,7 @@ function updateSingleBot(bot) {
   const chaseNeedsLift = behavior.mode === "chase" && (focusAboveBot || Math.abs(verticalDelta) > 20);
   const fleeNeedsLift = behavior.mode === "flee" && (focusNearX || Math.abs(verticalDelta) < 72);
   if (bot.onGround && bot.jumpCooldown <= 0 && bot.queuedJumpId === 0 && (chaseNeedsLift || fleeNeedsLift)) {
-    bot.vy = -(bot.jumpStrength + 0.45);
+    bot.vy = -(effectiveJumpStrength + 0.5);
     bot.onGround = false;
     bot.jumpsUsed = 1;
     bot.jumpCooldown = 6;
@@ -799,7 +993,7 @@ function updateSingleBot(bot) {
         ? verticalDelta < -16 || Math.abs(targetX - botCenterX) > 72
         : focusNearX || verticalDelta < -20;
     if (shouldAirJump && bot.vy > -2.4) {
-      bot.vy = -(bot.jumpStrength - 0.6);
+      bot.vy = -(effectiveJumpStrength - 0.75);
       bot.jumpsUsed += 1;
       bot.jumpCooldown = 6;
     }
@@ -813,6 +1007,7 @@ function updateSingleBot(bot) {
 
   bot.y += bot.vy;
   resolveVerticalCollisions(bot, platforms);
+  tryBounceFromPads(bot, BOUNCE_PAD_BOT_STRENGTH);
 
   if (bot.y < 0) {
     bot.y = 0;
@@ -863,6 +1058,8 @@ function updateCamera() {
 
 function update() {
   if (state.mode === "playing") {
+    updateBouncePads();
+
     if (state.eliminationFramesRemaining > 0) {
       resolveEliminationPhase();
       updateCamera();
@@ -875,6 +1072,7 @@ function update() {
 
       updateBots();
       updateTokenTransfer();
+      updatePowerUps();
       checkHazards();
 
       if (!finishMatchIfNeeded()) {
@@ -945,6 +1143,51 @@ function drawPlatforms() {
     }
     ctx.fillStyle = "#8dd170";
     ctx.fillRect(platform.x, platform.y, platform.w, 6);
+  }
+}
+
+function drawBouncePads() {
+  for (const pad of bouncePads) {
+    const flash = pad.flashFrames / 10;
+    if (flash > 0) {
+      ctx.fillStyle = `rgba(193, 129, 255, ${0.22 + flash * 0.44})`;
+      ctx.fillRect(pad.x - 6, pad.y - 10, pad.w + 12, pad.h + 14);
+    }
+
+    ctx.fillStyle = "#6d45e6";
+    ctx.fillRect(pad.x, pad.y - 5, pad.w, pad.h);
+    ctx.fillStyle = "#d8c9ff";
+    ctx.fillRect(pad.x + 6, pad.y - 3, pad.w - 12, 3);
+  }
+}
+
+function drawPowerUps() {
+  for (const powerUp of powerUps) {
+    if (!powerUp.active) {
+      continue;
+    }
+
+    const y = getPowerUpY(powerUp);
+    const centerX = powerUp.x + powerUp.w * 0.5;
+    const centerY = y + powerUp.h * 0.5;
+    const pulse = (Math.sin(powerUp.bobPhase * 2.2) + 1) * 0.5;
+    const color = powerUp.type === "speed" ? "#6eefff" : "#ffd46b";
+    const glyph = powerUp.type === "speed" ? "S" : "J";
+
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.12 + pulse * 0.18})`;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, powerUp.w * 0.62 + pulse * 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, powerUp.w * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(20, 29, 61, 0.95)";
+    ctx.font = "700 14px \"Segoe UI\", sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(glyph, centerX, centerY + 5);
   }
 }
 
@@ -1107,6 +1350,8 @@ function draw() {
   ctx.translate(0, -cameraY);
   drawWalls();
   drawPlatforms();
+  drawBouncePads();
+  drawPowerUps();
   drawHazards();
   drawEliminationSpiral();
   drawBots();
