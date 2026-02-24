@@ -29,6 +29,36 @@ const ROUND_TIMER_SECONDS = 20;
 const ROUND_DURATION_FRAMES = ROUND_TIMER_SECONDS * 60;
 const ELIMINATION_SPIN_FRAMES = 2 * 60;
 const BOT_NAMES = ["Rex", "Nova", "Blitz", "Dash", "Vex", "Orbit"];
+const TROPHY_STORAGE_KEY = "skybound_sprint_trophies_v1";
+const TROPHY_DELTA_BY_PLACE = {
+  1: 10,
+  2: 5,
+  3: -5,
+  4: -10,
+};
+const BOT_DIFFICULTY_EASY = {
+  chaseAcceleration: 0.44,
+  fleeAcceleration: 0.48,
+  chaseBurstFar: 1.05,
+  chaseBurstNear: 0.34,
+  fleeBurstFar: 0.92,
+  fleeBurstNear: 0.24,
+  maxVerticalSearch: 170,
+  maxHorizontalSearch: 270,
+  predictionFrames: 6,
+  playerFocusChance: 0.58,
+  chaseRetargetFrames: 30,
+  fleeFallbackDistance: 180,
+  chaseAimBlend: 0.18,
+  chaseStarterSpeed: 0.75,
+  jumpCooldownDecay: 0.76,
+  copiedJumpCooldown: 8,
+  groundJumpCooldown: 10,
+  airJumpCooldown: 10,
+  airJumpVyThreshold: -0.6,
+  chaseAirJumpDistance: 96,
+};
+const BOT_DIFFICULTY_TROPHY_SCALE = 220;
 const PLAYER_CHARACTERS = [
   { id: "classic", label: "Classic", primary: "#2f55c6", accent: "#89b4ff", eye: "#173070" },
   { id: "ember", label: "Ember", primary: "#d35e2d", accent: "#ffc48c", eye: "#642717" },
@@ -141,7 +171,6 @@ const POWER_UP_DURATION_FRAMES = 8 * 60;
 const POWER_UP_RESPAWN_MIN_FRAMES = 6 * 60;
 const POWER_UP_RESPAWN_MAX_FRAMES = 11 * 60;
 const BOT_DIFFICULTY = {
-  baseSpeedBoost: 1.45,
   chaseAcceleration: 0.92,
   fleeAcceleration: 0.98,
   chaseBurstFar: 2.9,
@@ -170,6 +199,27 @@ let selectedBotCharacterSetId = BOT_CHARACTER_SETS[0].id;
 let selectedThemeId = THEMES[0].id;
 let selectedPlaceId = PLACE_OPTIONS[0].id;
 let currentTheme = THEMES[0];
+
+function loadStoredTrophies() {
+  try {
+    const raw = window.localStorage.getItem(TROPHY_STORAGE_KEY);
+    const parsed = raw === null ? 0 : Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) {
+      return 0;
+    }
+    return clamp(parsed, -9999, 9999);
+  } catch (error) {
+    return 0;
+  }
+}
+
+function saveStoredTrophies(value) {
+  try {
+    window.localStorage.setItem(TROPHY_STORAGE_KEY, String(clamp(Math.round(value), -9999, 9999)));
+  } catch (error) {
+    // Ignore storage failures in restricted browser modes.
+  }
+}
 
 function buildFloorPlatform() {
   return {
@@ -471,8 +521,8 @@ function createBot(index) {
     alive: true,
     maxJumps: 3,
     jumpsUsed: 0,
-    maxSpeed: 6.9 - width * 0.03 + BOT_DIFFICULTY.baseSpeedBoost * 0.35,
-    jumpStrength: 12.6 + (height - 40) * 0.08,
+    maxSpeed: 4.95 - width * 0.02,
+    jumpStrength: 11.2 + (height - 40) * 0.05,
     jumpCooldown: 0,
     copyJumpLag: 0,
     copyJumpTimer: 0,
@@ -500,6 +550,11 @@ const state = {
   eliminationTargetBotId: -1,
   winnerType: "none",
   winnerBotId: -1,
+  playerTrophies: loadStoredTrophies(),
+  roundStartCount: BOT_COUNT + 1,
+  eliminationOrder: [],
+  playerPlace: 0,
+  trophyDeltaThisRound: 0,
 };
 
 const tokenImage = new Image();
@@ -610,7 +665,8 @@ function setHomeScreenVisible(visible) {
 }
 
 function updateHomeHud() {
-  hudStatus.textContent = "Enter your name, pick character/theme, then start - place is random every run";
+  hudStatus.textContent =
+    `Trophies: ${state.playerTrophies} | Bot difficulty: ${getBotDifficultyLabel()} | Character select ready | Place is random each run`;
 }
 
 function applyHomeSlotImage() {
@@ -719,6 +775,7 @@ function openHomeScreen() {
   jumpRequested = false;
   setHomeScreenVisible(true);
   updateHomeHud();
+  renderHomeOptions();
 
   if (playerNameInput) {
     playerNameInput.value = playerName;
@@ -778,9 +835,9 @@ function getEntityCenterX(entity) {
   return entity.x + entity.w * 0.5;
 }
 
-function getPredictedFocusX(focusEntity, mode) {
+function getPredictedFocusX(focusEntity, mode, leadFramesOverride = null) {
   const centerX = getEntityCenterX(focusEntity);
-  const leadFrames = mode === "chase" ? BOT_DIFFICULTY.predictionFrames : 10;
+  const leadFrames = leadFramesOverride ?? (mode === "chase" ? BOT_DIFFICULTY.predictionFrames : 10);
   const vx = typeof focusEntity.vx === "number" ? focusEntity.vx : 0;
   const lead = clamp(vx * leadFrames, -155, 155);
   return clamp(centerX + lead, WALL_THICKNESS + 8, WORLD.width - WALL_THICKNESS - 8);
@@ -788,6 +845,92 @@ function getPredictedFocusX(focusEntity, mode) {
 
 function randomRangeInt(min, max) {
   return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+function lerp(from, to, progress) {
+  return from + (to - from) * progress;
+}
+
+function toOrdinal(value) {
+  if (value === 1) {
+    return "1st";
+  }
+  if (value === 2) {
+    return "2nd";
+  }
+  if (value === 3) {
+    return "3rd";
+  }
+  return `${value}th`;
+}
+
+function getBotDifficultyProgress() {
+  const trophies = Math.max(0, state.playerTrophies);
+  return clamp(trophies / BOT_DIFFICULTY_TROPHY_SCALE, 0, 1);
+}
+
+function getBotDifficultyTuning() {
+  const progress = getBotDifficultyProgress();
+  return {
+    chaseAcceleration: lerp(BOT_DIFFICULTY_EASY.chaseAcceleration, BOT_DIFFICULTY.chaseAcceleration, progress),
+    fleeAcceleration: lerp(BOT_DIFFICULTY_EASY.fleeAcceleration, BOT_DIFFICULTY.fleeAcceleration, progress),
+    chaseBurstFar: lerp(BOT_DIFFICULTY_EASY.chaseBurstFar, BOT_DIFFICULTY.chaseBurstFar, progress),
+    chaseBurstNear: lerp(BOT_DIFFICULTY_EASY.chaseBurstNear, BOT_DIFFICULTY.chaseBurstNear, progress),
+    fleeBurstFar: lerp(BOT_DIFFICULTY_EASY.fleeBurstFar, BOT_DIFFICULTY.fleeBurstFar, progress),
+    fleeBurstNear: lerp(BOT_DIFFICULTY_EASY.fleeBurstNear, BOT_DIFFICULTY.fleeBurstNear, progress),
+    maxVerticalSearch: lerp(BOT_DIFFICULTY_EASY.maxVerticalSearch, BOT_DIFFICULTY.maxVerticalSearch, progress),
+    maxHorizontalSearch: lerp(BOT_DIFFICULTY_EASY.maxHorizontalSearch, BOT_DIFFICULTY.maxHorizontalSearch, progress),
+    predictionFrames: lerp(BOT_DIFFICULTY_EASY.predictionFrames, BOT_DIFFICULTY.predictionFrames, progress),
+    playerFocusChance: lerp(BOT_DIFFICULTY_EASY.playerFocusChance, 0.92, progress),
+    chaseRetargetFrames: Math.round(lerp(BOT_DIFFICULTY_EASY.chaseRetargetFrames, 10, progress)),
+    fleeFallbackDistance: lerp(BOT_DIFFICULTY_EASY.fleeFallbackDistance, 250, progress),
+    chaseAimBlend: lerp(BOT_DIFFICULTY_EASY.chaseAimBlend, 0.38, progress),
+    chaseStarterSpeed: lerp(BOT_DIFFICULTY_EASY.chaseStarterSpeed, 1.3, progress),
+    jumpCooldownDecay: lerp(BOT_DIFFICULTY_EASY.jumpCooldownDecay, 1.2, progress),
+    copiedJumpCooldown: Math.round(lerp(BOT_DIFFICULTY_EASY.copiedJumpCooldown, 4, progress)),
+    groundJumpCooldown: Math.round(lerp(BOT_DIFFICULTY_EASY.groundJumpCooldown, 6, progress)),
+    airJumpCooldown: Math.round(lerp(BOT_DIFFICULTY_EASY.airJumpCooldown, 6, progress)),
+    airJumpVyThreshold: lerp(BOT_DIFFICULTY_EASY.airJumpVyThreshold, -2.4, progress),
+    chaseAirJumpDistance: lerp(BOT_DIFFICULTY_EASY.chaseAirJumpDistance, 72, progress),
+  };
+}
+
+function getBotDifficultyLabel() {
+  const progress = getBotDifficultyProgress();
+  if (progress < 0.22) {
+    return "Easy";
+  }
+  if (progress < 0.5) {
+    return "Medium";
+  }
+  if (progress < 0.82) {
+    return "Hard";
+  }
+  return "Insane";
+}
+
+function getTrophyDeltaForPlace(place) {
+  return TROPHY_DELTA_BY_PLACE[place] ?? 0;
+}
+
+function getPlayerPlacementForRound() {
+  if (state.winnerType === "player") {
+    return 1;
+  }
+
+  const eliminationIndex = state.eliminationOrder.findIndex((entry) => entry.type === "player");
+  if (eliminationIndex === -1) {
+    return state.roundStartCount;
+  }
+
+  return clamp(state.roundStartCount - eliminationIndex, 1, state.roundStartCount);
+}
+
+function finalizeRoundTrophies() {
+  state.playerPlace = getPlayerPlacementForRound();
+  state.trophyDeltaThisRound = getTrophyDeltaForPlace(state.playerPlace);
+  state.playerTrophies = clamp(state.playerTrophies + state.trophyDeltaThisRound, -9999, 9999);
+  saveStoredTrophies(state.playerTrophies);
 }
 
 function getCurrentGravity() {
@@ -1064,7 +1207,9 @@ function updateHudStatus() {
   const aliveCount = getParticipants().length;
 
   if (state.mode === "finished") {
-    hudStatus.textContent = `Winner: ${getWinnerLabel()} | Press R to reset arena`;
+    const trophyDeltaText = `${state.trophyDeltaThisRound >= 0 ? "+" : ""}${state.trophyDeltaThisRound}`;
+    hudStatus.textContent =
+      `Winner: ${getWinnerLabel()} | You: ${toOrdinal(state.playerPlace)} (${trophyDeltaText}) | Trophies: ${state.playerTrophies} | Press R to reset`;
     return;
   }
 
@@ -1077,7 +1222,7 @@ function updateHudStatus() {
   const holder = getCurrentTokenHolder();
   const secondsLeft = Math.ceil(state.roundFramesRemaining / 60);
   hudStatus.textContent =
-    `Timer: ${secondsLeft}s | Alive: ${aliveCount} | Holder: ${getHolderLabel(holder)} | Place: ${getSelectedPlace().label} | Power: ${getPlayerPowerUpLabel()}`;
+    `Timer: ${secondsLeft}s | Alive: ${aliveCount} | Holder: ${getHolderLabel(holder)} | Place: ${getSelectedPlace().label} | Trophies: ${state.playerTrophies} | Bots: ${getBotDifficultyLabel()} | Power: ${getPlayerPowerUpLabel()}`;
 }
 
 function getEliminationTarget() {
@@ -1097,6 +1242,8 @@ function eliminateParticipant(participant) {
   if (!participant) {
     return;
   }
+
+  state.eliminationOrder.push({ type: participant.type, botId: participant.botId });
 
   if (participant.type === "player") {
     player.alive = false;
@@ -1137,6 +1284,8 @@ function finishMatchIfNeeded() {
     state.winnerType = "none";
     state.winnerBotId = -1;
   }
+
+  finalizeRoundTrophies();
 
   return true;
 }
@@ -1210,12 +1359,16 @@ function resetGame() {
   state.eliminationTargetBotId = -1;
   state.winnerType = "none";
   state.winnerBotId = -1;
+  state.playerPlace = 0;
+  state.trophyDeltaThisRound = 0;
+  state.eliminationOrder = [];
   jumpRequested = false;
   introHintFrames = 210;
   playerJumpSignalId = 0;
   playerJumpSignalVy = 0;
   resetPlayerToSpawn();
   resetBots();
+  state.roundStartCount = 1 + bots.filter((bot) => bot.alive).length;
   resetPowerUps();
   assignRandomTokenHolder();
   updateHudStatus();
@@ -1327,7 +1480,7 @@ function updatePlayer() {
   }
 }
 
-function getBotBehavior(bot) {
+function getBotBehavior(bot, difficulty) {
   const holder = getCurrentTokenHolder();
   const participants = getParticipants().filter((participant) => participant.entity !== bot);
   if (!holder || participants.length === 0) {
@@ -1339,8 +1492,10 @@ function getBotBehavior(bot) {
     const nonPlayerTargets = participants.filter((participant) => participant.type === "bot");
 
     if (bot.chaseRetargetTimer <= 0) {
-      bot.prefersPlayerTarget = playerTarget ? nonPlayerTargets.length === 0 || Math.random() < 0.92 : false;
-      bot.chaseRetargetTimer = 10;
+      bot.prefersPlayerTarget = playerTarget
+        ? nonPlayerTargets.length === 0 || Math.random() < difficulty.playerFocusChance
+        : false;
+      bot.chaseRetargetTimer = difficulty.chaseRetargetFrames;
     } else {
       bot.chaseRetargetTimer -= 1;
     }
@@ -1382,8 +1537,8 @@ function getBotBehavior(bot) {
   return { mode: "flee", targetEntity: threatEntity };
 }
 
-function chooseBotTargetPlatform(bot, focusEntity, mode) {
-  const focusCenterX = getPredictedFocusX(focusEntity, mode);
+function chooseBotTargetPlatform(bot, focusEntity, mode, difficulty) {
+  const focusCenterX = getPredictedFocusX(focusEntity, mode, difficulty.predictionFrames);
   const botCenterX = getEntityCenterX(bot);
   const focusAbove = focusEntity.y < bot.y - 14;
   const fleeDirection = Math.sign(botCenterX - focusCenterX) || (botCenterX < WORLD.width * 0.5 ? -1 : 1);
@@ -1402,7 +1557,7 @@ function chooseBotTargetPlatform(bot, focusEntity, mode) {
     }
 
     const verticalGap = Math.abs(platform.y - bot.y);
-    if (verticalGap > BOT_DIFFICULTY.maxVerticalSearch) {
+    if (verticalGap > difficulty.maxVerticalSearch) {
       continue;
     }
 
@@ -1414,7 +1569,7 @@ function chooseBotTargetPlatform(bot, focusEntity, mode) {
           : platform.x + 8;
 
     const distanceToAim = Math.abs(aimX - botCenterX);
-    if (distanceToAim > BOT_DIFFICULTY.maxHorizontalSearch) {
+    if (distanceToAim > difficulty.maxHorizontalSearch) {
       continue;
     }
 
@@ -1436,25 +1591,26 @@ function chooseBotTargetPlatform(bot, focusEntity, mode) {
 
 function updateSingleBot(bot) {
   updateEntityPowerTimers(bot);
+  const difficulty = getBotDifficultyTuning();
 
-  const behavior = getBotBehavior(bot);
+  const behavior = getBotBehavior(bot, difficulty);
   const focusEntity = behavior.targetEntity;
   const focusCenterX = getEntityCenterX(focusEntity);
   const botCenterX = getEntityCenterX(bot);
-  const predictedFocusX = getPredictedFocusX(focusEntity, behavior.mode);
+  const predictedFocusX = getPredictedFocusX(focusEntity, behavior.mode, difficulty.predictionFrames);
   const effectiveJumpStrength = getEntityJumpStrength(bot);
-  const target = chooseBotTargetPlatform(bot, focusEntity, behavior.mode);
+  const target = chooseBotTargetPlatform(bot, focusEntity, behavior.mode, difficulty);
   let targetX = target ? target.aimX : predictedFocusX;
 
   if (behavior.mode === "flee" && !target) {
     const fleeDirection = Math.sign(botCenterX - focusCenterX) || (botCenterX < WORLD.width * 0.5 ? -1 : 1);
-    targetX = botCenterX + fleeDirection * 250;
+    targetX = botCenterX + fleeDirection * difficulty.fleeFallbackDistance;
   } else if (behavior.mode === "chase" && target) {
-    targetX = target.aimX * 0.62 + predictedFocusX * 0.38;
+    targetX = target.aimX * (1 - difficulty.chaseAimBlend) + predictedFocusX * difficulty.chaseAimBlend;
   }
 
   const acceleration =
-    (behavior.mode === "chase" ? BOT_DIFFICULTY.chaseAcceleration : BOT_DIFFICULTY.fleeAcceleration) *
+    (behavior.mode === "chase" ? difficulty.chaseAcceleration : difficulty.fleeAcceleration) *
     currentPlaceRules.botAccelScale;
   const friction = clamp(0.9 + currentPlaceRules.botFrictionOffset, 0.78, 0.98);
 
@@ -1469,8 +1625,8 @@ function updateSingleBot(bot) {
     bot.vx *= friction;
   }
 
-  if (behavior.mode === "chase" && intentX !== 0 && Math.abs(bot.vx) < 1.3) {
-    bot.vx = intentX * 1.3;
+  if (behavior.mode === "chase" && intentX !== 0 && Math.abs(bot.vx) < difficulty.chaseStarterSpeed) {
+    bot.vx = intentX * difficulty.chaseStarterSpeed;
   }
 
   const distanceToTargetX = Math.abs(targetX - botCenterX);
@@ -1478,11 +1634,11 @@ function updateSingleBot(bot) {
     getEntityMaxSpeed(bot) +
     (behavior.mode === "chase"
       ? distanceToTargetX > 120
-        ? BOT_DIFFICULTY.chaseBurstFar
-        : BOT_DIFFICULTY.chaseBurstNear
+        ? difficulty.chaseBurstFar
+        : difficulty.chaseBurstNear
       : distanceToTargetX > 120
-        ? BOT_DIFFICULTY.fleeBurstFar
-        : BOT_DIFFICULTY.fleeBurstNear);
+        ? difficulty.fleeBurstFar
+        : difficulty.fleeBurstNear);
 
   if (behavior.mode === "chase" && focusEntity === player) {
     dynamicMaxSpeed += 0.7;
@@ -1498,7 +1654,7 @@ function updateSingleBot(bot) {
   }
 
   if (bot.jumpCooldown > 0) {
-    bot.jumpCooldown = Math.max(0, bot.jumpCooldown - 1.2);
+    bot.jumpCooldown = Math.max(0, bot.jumpCooldown - difficulty.jumpCooldownDecay);
   }
 
   if (bot.lastCopiedJumpId < playerJumpSignalId && bot.queuedJumpId !== playerJumpSignalId) {
@@ -1519,7 +1675,7 @@ function updateSingleBot(bot) {
         bot.vy = -copiedStrength;
         bot.onGround = false;
         bot.jumpsUsed += 1;
-        bot.jumpCooldown = 4;
+        bot.jumpCooldown = difficulty.copiedJumpCooldown;
       }
 
       bot.lastCopiedJumpId = bot.queuedJumpId;
@@ -1536,16 +1692,16 @@ function updateSingleBot(bot) {
     bot.vy = -(effectiveJumpStrength + 0.5);
     bot.onGround = false;
     bot.jumpsUsed = 1;
-    bot.jumpCooldown = 6;
+    bot.jumpCooldown = difficulty.groundJumpCooldown;
   } else if (!bot.onGround && bot.jumpCooldown <= 0 && bot.jumpsUsed < bot.maxJumps) {
     const shouldAirJump =
       behavior.mode === "chase"
-        ? verticalDelta < -16 || Math.abs(targetX - botCenterX) > 72
+        ? verticalDelta < -16 || Math.abs(targetX - botCenterX) > difficulty.chaseAirJumpDistance
         : focusNearX || verticalDelta < -20;
-    if (shouldAirJump && bot.vy > -2.4) {
+    if (shouldAirJump && bot.vy > difficulty.airJumpVyThreshold) {
       bot.vy = -(effectiveJumpStrength - 0.75);
       bot.jumpsUsed += 1;
-      bot.jumpCooldown = 6;
+      bot.jumpCooldown = difficulty.airJumpCooldown;
     }
   }
 
@@ -1916,6 +2072,37 @@ function drawScreenTimer() {
   ctx.fillText(timerText, x + w / 2, y + 43);
 }
 
+function drawTrophyPanel() {
+  if (appPhase !== "game") {
+    return;
+  }
+
+  const x = 18;
+  const y = 20;
+  const w = 226;
+  const h = 62;
+
+  ctx.fillStyle = "rgba(10, 15, 39, 0.62)";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = "rgba(245, 210, 123, 0.72)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+
+  ctx.fillStyle = "#f6dda4";
+  ctx.font = '700 12px "Segoe UI", sans-serif';
+  ctx.textAlign = "left";
+  ctx.fillText("TROPHIES", x + 10, y + 17);
+
+  ctx.fillStyle = "#fff0ca";
+  ctx.font = '800 24px "Segoe UI", sans-serif';
+  ctx.fillText(String(state.playerTrophies), x + 10, y + 45);
+
+  ctx.fillStyle = "#d0d9ff";
+  ctx.font = '600 12px "Segoe UI", sans-serif';
+  ctx.textAlign = "right";
+  ctx.fillText(`Bots: ${getBotDifficultyLabel()}`, x + w - 10, y + 45);
+}
+
 function drawOverlay() {
   if (state.mode !== "finished") {
     return;
@@ -1958,6 +2145,7 @@ function draw() {
   ctx.restore();
 
   drawIntroHint();
+  drawTrophyPanel();
   drawScreenTimer();
   drawOverlay();
 }
