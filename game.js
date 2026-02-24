@@ -6,6 +6,11 @@ const homeScreen = document.getElementById("home-screen");
 const playerNameInput = document.getElementById("player-name-input");
 const gameSlotPlay = document.getElementById("game-slot-play");
 const slotSpiralImage = document.getElementById("slot-spiral-image");
+const playerCharacterOptions = document.getElementById("player-character-options");
+const botCharacterOptions = document.getElementById("bot-character-options");
+const themeOptions = document.getElementById("theme-options");
+const placeTapeTrack = document.getElementById("place-tape-track");
+const selectedPlaceLabel = document.getElementById("selected-place-label");
 
 const WORLD = {
   width: 960,
@@ -24,6 +29,111 @@ const ROUND_TIMER_SECONDS = 20;
 const ROUND_DURATION_FRAMES = ROUND_TIMER_SECONDS * 60;
 const ELIMINATION_SPIN_FRAMES = 2 * 60;
 const BOT_NAMES = ["Rex", "Nova", "Blitz", "Dash", "Vex", "Orbit"];
+const PLAYER_CHARACTERS = [
+  { id: "classic", label: "Classic", primary: "#2f55c6", accent: "#89b4ff", eye: "#173070" },
+  { id: "ember", label: "Ember", primary: "#d35e2d", accent: "#ffc48c", eye: "#642717" },
+  { id: "mint", label: "Mint", primary: "#1b9687", accent: "#97f4d1", eye: "#0d4a41" },
+  { id: "shadow", label: "Shadow", primary: "#3f4761", accent: "#b6bed8", eye: "#171d2d" },
+];
+const BOT_CHARACTER_SETS = [
+  { id: "wild", label: "Wild", hueShift: 0, satShift: 0, lightShift: 0 },
+  { id: "neon", label: "Neon", hueShift: 54, satShift: 16, lightShift: 6 },
+  { id: "frost", label: "Frost", hueShift: 192, satShift: -8, lightShift: 10 },
+  { id: "sunset", label: "Sunset", hueShift: -38, satShift: 8, lightShift: -2 },
+];
+const THEMES = [
+  {
+    id: "skybound",
+    label: "Skybound",
+    bodyBackground: "radial-gradient(circle at top, #252d5a 0%, #0b1022 55%, #060913 100%)",
+    subtitleColor: "#b8c2ff",
+    hudBorder: "rgba(255, 255, 255, 0.16)",
+    hudBg: "rgba(7, 12, 33, 0.6)",
+    homeBg: "linear-gradient(rgba(7, 11, 30, 0.9), rgba(6, 9, 22, 0.9))",
+    accent: "rgba(255, 213, 132, 0.95)",
+    skyTop: "#15234f",
+    skyMid: "#2a4b89",
+    skyBottom: "#73b8ff",
+    wallDark: "#2f384f",
+    wallLight: "#4a5a7b",
+    platformBase: "#2f6542",
+    platformTop: "#8dd170",
+    timerBox: "rgba(9, 14, 37, 0.58)",
+    timerStroke: "rgba(188, 205, 255, 0.55)",
+    timerLabel: "#c6d7ff",
+    timerText: "#f4f8ff",
+  },
+  {
+    id: "neon-night",
+    label: "Neon Night",
+    bodyBackground: "radial-gradient(circle at top, #3f1962 0%, #120827 58%, #07030f 100%)",
+    subtitleColor: "#d9b9ff",
+    hudBorder: "rgba(255, 171, 255, 0.34)",
+    hudBg: "rgba(32, 8, 53, 0.66)",
+    homeBg: "linear-gradient(rgba(28, 7, 46, 0.94), rgba(9, 6, 23, 0.94))",
+    accent: "rgba(255, 156, 247, 0.95)",
+    skyTop: "#39165a",
+    skyMid: "#6a2691",
+    skyBottom: "#c06fff",
+    wallDark: "#38284b",
+    wallLight: "#61407f",
+    platformBase: "#3e245b",
+    platformTop: "#e89bff",
+    timerBox: "rgba(40, 8, 52, 0.6)",
+    timerStroke: "rgba(236, 148, 255, 0.7)",
+    timerLabel: "#efc5ff",
+    timerText: "#fff1ff",
+  },
+  {
+    id: "cryo-core",
+    label: "Cryo Core",
+    bodyBackground: "radial-gradient(circle at top, #11394c 0%, #071825 56%, #040b12 100%)",
+    subtitleColor: "#b8f1ff",
+    hudBorder: "rgba(157, 244, 255, 0.3)",
+    hudBg: "rgba(6, 25, 35, 0.62)",
+    homeBg: "linear-gradient(rgba(4, 28, 38, 0.94), rgba(5, 12, 22, 0.94))",
+    accent: "rgba(131, 239, 255, 0.95)",
+    skyTop: "#14445b",
+    skyMid: "#1f7390",
+    skyBottom: "#8fe9ff",
+    wallDark: "#2d4859",
+    wallLight: "#4f7488",
+    platformBase: "#2a5a61",
+    platformTop: "#a5f4ff",
+    timerBox: "rgba(7, 34, 44, 0.62)",
+    timerStroke: "rgba(139, 243, 255, 0.68)",
+    timerLabel: "#bef9ff",
+    timerText: "#effeff",
+  },
+  {
+    id: "voltage-sunset",
+    label: "Voltage Sunset",
+    bodyBackground: "radial-gradient(circle at top, #6a2f1b 0%, #261112 58%, #10070a 100%)",
+    subtitleColor: "#ffd3b8",
+    hudBorder: "rgba(255, 184, 140, 0.35)",
+    hudBg: "rgba(42, 16, 12, 0.62)",
+    homeBg: "linear-gradient(rgba(49, 18, 12, 0.94), rgba(18, 8, 11, 0.94))",
+    accent: "rgba(255, 177, 112, 0.95)",
+    skyTop: "#5a2319",
+    skyMid: "#a44926",
+    skyBottom: "#ffb571",
+    wallDark: "#5f2f28",
+    wallLight: "#8d4b38",
+    platformBase: "#784830",
+    platformTop: "#ffcf93",
+    timerBox: "rgba(52, 20, 12, 0.62)",
+    timerStroke: "rgba(255, 177, 112, 0.7)",
+    timerLabel: "#ffd7ae",
+    timerText: "#fff4e9",
+  },
+];
+const PLACE_OPTIONS = [
+  { id: "skyline-run", label: "Skyline Run" },
+  { id: "neon-arc", label: "Neon Arc" },
+  { id: "aurora-labs", label: "Aurora Labs" },
+  { id: "forge-path", label: "Forge Path" },
+  { id: "crystal-bay", label: "Crystal Bay" },
+];
 const BOUNCE_PAD_COOLDOWN_FRAMES = 14;
 const BOUNCE_PAD_PLAYER_STRENGTH = 24.8;
 const BOUNCE_PAD_BOT_STRENGTH = 23.6;
@@ -55,6 +165,11 @@ let playerJumpSignalId = 0;
 let playerJumpSignalVy = 0;
 let appPhase = "home";
 let playerName = "Player";
+let selectedPlayerCharacterId = PLAYER_CHARACTERS[0].id;
+let selectedBotCharacterSetId = BOT_CHARACTER_SETS[0].id;
+let selectedThemeId = THEMES[0].id;
+let selectedPlaceId = PLACE_OPTIONS[0].id;
+let currentTheme = THEMES[0];
 
 function buildPlatforms() {
   return [
@@ -126,14 +241,15 @@ const player = {
 function createBot(index) {
   const width = 14 + index * 2;
   const height = 40 + index * 4;
+  const botSet = getSelectedBotCharacterSet();
   const spawnSlots = [
     platforms[0].x + 20,
     WORLD.width / 2 - width / 2,
     platforms[1].x + platforms[1].w - width - 20,
   ];
-  const tintHue = (index * 37 + 40) % 360;
-  const tintSat = 58 + (index % 3) * 12;
-  const tintLight = 46 + (index % 3) * 8;
+  const tintHue = (index * 37 + 40 + botSet.hueShift + 360) % 360;
+  const tintSat = clamp(58 + (index % 3) * 12 + botSet.satShift, 26, 94);
+  const tintLight = clamp(46 + (index % 3) * 8 + botSet.lightShift, 26, 82);
 
   return {
     id: index,
@@ -252,6 +368,34 @@ function sanitizePlayerName(value) {
   return cleaned.length > 0 ? cleaned : "Player";
 }
 
+function getSelectedPlayerCharacter() {
+  return PLAYER_CHARACTERS.find((option) => option.id === selectedPlayerCharacterId) || PLAYER_CHARACTERS[0];
+}
+
+function getSelectedBotCharacterSet() {
+  return BOT_CHARACTER_SETS.find((option) => option.id === selectedBotCharacterSetId) || BOT_CHARACTER_SETS[0];
+}
+
+function getSelectedTheme() {
+  return THEMES.find((option) => option.id === selectedThemeId) || THEMES[0];
+}
+
+function getSelectedPlace() {
+  return PLACE_OPTIONS.find((option) => option.id === selectedPlaceId) || PLACE_OPTIONS[0];
+}
+
+function applyTheme(themeId) {
+  selectedThemeId = themeId;
+  const theme = getSelectedTheme();
+  currentTheme = theme;
+  document.documentElement.style.setProperty("--app-bg", theme.bodyBackground);
+  document.documentElement.style.setProperty("--subtitle-color", theme.subtitleColor);
+  document.documentElement.style.setProperty("--hud-border", theme.hudBorder);
+  document.documentElement.style.setProperty("--hud-bg", theme.hudBg);
+  document.documentElement.style.setProperty("--home-bg", theme.homeBg);
+  document.documentElement.style.setProperty("--home-accent", theme.accent);
+}
+
 function setHomeScreenVisible(visible) {
   if (homeScreen) {
     homeScreen.hidden = !visible;
@@ -259,7 +403,7 @@ function setHomeScreenVisible(visible) {
 }
 
 function updateHomeHud() {
-  hudStatus.textContent = "Enter your name and click the purple spiral slot to start";
+  hudStatus.textContent = "Enter your name, pick character/theme/place, then click the spiral slot";
 }
 
 function applyHomeSlotImage() {
@@ -287,6 +431,98 @@ function applyHomeSlotImage() {
   tryLoad();
 }
 
+function renderChoiceButtons(container, options, selectedId, onSelect) {
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML = "";
+  for (const option of options) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `choice-btn${option.id === selectedId ? " selected" : ""}`;
+    button.textContent = option.label;
+    button.addEventListener("click", () => onSelect(option.id));
+    container.appendChild(button);
+  }
+}
+
+function updateSelectedPlaceLabel() {
+  if (selectedPlaceLabel) {
+    selectedPlaceLabel.textContent = getSelectedPlace().label;
+  }
+}
+
+function refreshPlaceTapeSelection() {
+  if (!placeTapeTrack) {
+    return;
+  }
+
+  const cards = placeTapeTrack.querySelectorAll(".place-card");
+  for (const card of cards) {
+    card.classList.toggle("selected", card.dataset.placeId === selectedPlaceId);
+  }
+}
+
+function renderPlaceTape() {
+  if (!placeTapeTrack) {
+    return;
+  }
+
+  placeTapeTrack.innerHTML = "";
+  const tapePlaces = [...PLACE_OPTIONS, ...PLACE_OPTIONS];
+  for (const place of tapePlaces) {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "place-card";
+    card.dataset.placeId = place.id;
+    card.textContent = place.label;
+    card.addEventListener("click", () => {
+      selectedPlaceId = place.id;
+      updateSelectedPlaceLabel();
+      refreshPlaceTapeSelection();
+    });
+    placeTapeTrack.appendChild(card);
+  }
+
+  updateSelectedPlaceLabel();
+  refreshPlaceTapeSelection();
+}
+
+function renderHomeOptions() {
+  renderChoiceButtons(playerCharacterOptions, PLAYER_CHARACTERS, selectedPlayerCharacterId, (id) => {
+    selectedPlayerCharacterId = id;
+    renderHomeOptions();
+  });
+
+  renderChoiceButtons(botCharacterOptions, BOT_CHARACTER_SETS, selectedBotCharacterSetId, (id) => {
+    selectedBotCharacterSetId = id;
+    renderHomeOptions();
+  });
+
+  renderChoiceButtons(themeOptions, THEMES, selectedThemeId, (id) => {
+    applyTheme(id);
+    renderHomeOptions();
+  });
+
+  renderPlaceTape();
+}
+
+function openHomeScreen() {
+  appPhase = "home";
+  keys.left = false;
+  keys.right = false;
+  jumpRequested = false;
+  setHomeScreenVisible(true);
+  updateHomeHud();
+
+  if (playerNameInput) {
+    playerNameInput.value = playerName;
+    playerNameInput.focus();
+    playerNameInput.select();
+  }
+}
+
 function startGameFromHome() {
   playerName = sanitizePlayerName(playerNameInput ? playerNameInput.value : playerName);
   if (playerNameInput) {
@@ -299,8 +535,10 @@ function startGameFromHome() {
 }
 
 function initializeHomeScreen() {
+  applyTheme(selectedThemeId);
   setHomeScreenVisible(true);
   updateHomeHud();
+  renderHomeOptions();
 
   if (playerNameInput) {
     playerNameInput.value = playerName;
@@ -618,7 +856,7 @@ function updateHudStatus() {
   const holder = getCurrentTokenHolder();
   const secondsLeft = Math.ceil(state.roundFramesRemaining / 60);
   hudStatus.textContent =
-    `Timer: ${secondsLeft}s | Alive: ${aliveCount} | Holder: ${getHolderLabel(holder)} | Power: ${getPlayerPowerUpLabel()}`;
+    `Timer: ${secondsLeft}s | Alive: ${aliveCount} | Holder: ${getHolderLabel(holder)} | Place: ${getSelectedPlace().label} | Power: ${getPlayerPowerUpLabel()}`;
 }
 
 function getEliminationTarget() {
@@ -1187,9 +1425,9 @@ function update() {
 
 function drawBackground() {
   const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  sky.addColorStop(0, "#15234f");
-  sky.addColorStop(0.45, "#2a4b89");
-  sky.addColorStop(1, "#73b8ff");
+  sky.addColorStop(0, currentTheme.skyTop);
+  sky.addColorStop(0.45, currentTheme.skyMid);
+  sky.addColorStop(1, currentTheme.skyBottom);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -1206,9 +1444,9 @@ function drawWalls() {
   const rightWall = { x: WORLD.width - WALL_THICKNESS, y: 0, w: WALL_THICKNESS, h: WORLD.height };
 
   for (const wall of [leftWall, rightWall]) {
-    ctx.fillStyle = "#2f384f";
+    ctx.fillStyle = currentTheme.wallDark;
     ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
-    ctx.fillStyle = "#4a5a7b";
+    ctx.fillStyle = currentTheme.wallLight;
     for (let y = wall.y + 14; y < wall.h; y += 44) {
       ctx.fillRect(wall.x + 5, y, wall.w - 10, 4);
     }
@@ -1217,7 +1455,7 @@ function drawWalls() {
 
 function drawPlatforms() {
   for (const platform of platforms) {
-    ctx.fillStyle = "#2f6542";
+    ctx.fillStyle = currentTheme.platformBase;
     ctx.fillRect(platform.x, platform.y, platform.w, platform.h);
     if (platformTextureLoaded) {
       if (!platformTexturePattern) {
@@ -1232,7 +1470,7 @@ function drawPlatforms() {
         ctx.restore();
       }
     }
-    ctx.fillStyle = "#8dd170";
+    ctx.fillStyle = currentTheme.platformTop;
     ctx.fillRect(platform.x, platform.y, platform.w, 6);
   }
 }
@@ -1399,12 +1637,13 @@ function drawPlayer() {
     return;
   }
 
-  ctx.fillStyle = "#2f55c6";
+  const playerCharacter = getSelectedPlayerCharacter();
+  ctx.fillStyle = playerCharacter.primary;
   ctx.fillRect(player.x, player.y, player.w, player.h);
-  ctx.fillStyle = "#89b4ff";
+  ctx.fillStyle = playerCharacter.accent;
   ctx.fillRect(player.x + 6, player.y + 6, player.w - 12, player.h - 12);
 
-  ctx.fillStyle = "#173070";
+  ctx.fillStyle = playerCharacter.eye;
   ctx.fillRect(player.x + 11, player.y + 15, 6, 6);
   ctx.fillRect(player.x + player.w - 17, player.y + 15, 6, 6);
 
@@ -1436,18 +1675,18 @@ function drawScreenTimer() {
   const w = 146;
   const h = 52;
 
-  ctx.fillStyle = "rgba(9, 14, 37, 0.58)";
+  ctx.fillStyle = currentTheme.timerBox;
   ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = "rgba(188, 205, 255, 0.55)";
+  ctx.strokeStyle = currentTheme.timerStroke;
   ctx.lineWidth = 2;
   ctx.strokeRect(x, y, w, h);
 
-  ctx.fillStyle = "#c6d7ff";
+  ctx.fillStyle = currentTheme.timerLabel;
   ctx.font = '600 12px "Segoe UI", sans-serif';
   ctx.textAlign = "center";
   ctx.fillText("TIMER", x + w / 2, y + 16);
 
-  ctx.fillStyle = "#f4f8ff";
+  ctx.fillStyle = currentTheme.timerText;
   ctx.font = '800 24px "Segoe UI", sans-serif';
   ctx.fillText(timerText, x + w / 2, y + 43);
 }
@@ -1474,7 +1713,7 @@ function drawIntroHint() {
   ctx.fillStyle = `rgba(247, 251, 255, ${alpha})`;
   ctx.font = '600 20px "Segoe UI", sans-serif';
   ctx.textAlign = "center";
-  ctx.fillText("Endless arena tag: holder chases, others flee", canvas.width / 2, 48);
+  ctx.fillText(`${getSelectedPlace().label}: holder chases, others flee`, canvas.width / 2, 48);
 }
 
 function draw() {
@@ -1510,6 +1749,12 @@ function keyDownHandler(event) {
       startGameFromHome();
       event.preventDefault();
     }
+    return;
+  }
+
+  if (key === "h") {
+    openHomeScreen();
+    event.preventDefault();
     return;
   }
 
