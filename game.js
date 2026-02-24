@@ -2,6 +2,10 @@ const canvas = document.getElementById("game-canvas");
 const ctx = canvas.getContext("2d");
 
 const hudStatus = document.getElementById("hud-status");
+const homeScreen = document.getElementById("home-screen");
+const playerNameInput = document.getElementById("player-name-input");
+const gameSlotPlay = document.getElementById("game-slot-play");
+const slotSpiralImage = document.getElementById("slot-spiral-image");
 
 const WORLD = {
   width: 960,
@@ -49,6 +53,8 @@ let cameraY = 0;
 let introHintFrames = 210;
 let playerJumpSignalId = 0;
 let playerJumpSignalVy = 0;
+let appPhase = "home";
+let playerName = "Player";
 
 function buildPlatforms() {
   return [
@@ -240,6 +246,78 @@ function loadPlatformTexture(index) {
 
 loadPlatformTexture(0);
 loadSpiralImage(0);
+
+function sanitizePlayerName(value) {
+  const cleaned = (value || "").replace(/[^a-zA-Z0-9 _-]/g, "").trim().slice(0, 16);
+  return cleaned.length > 0 ? cleaned : "Player";
+}
+
+function setHomeScreenVisible(visible) {
+  if (homeScreen) {
+    homeScreen.hidden = !visible;
+  }
+}
+
+function updateHomeHud() {
+  hudStatus.textContent = "Enter your name and click the purple spiral slot to start";
+}
+
+function applyHomeSlotImage() {
+  if (!slotSpiralImage) {
+    return;
+  }
+
+  const options = [
+    "./purple-spiral.png",
+    "./purple spiral.png",
+    "./purple_spiral.png",
+    "./purple-spiral.svg",
+  ];
+  let index = 0;
+
+  const tryLoad = () => {
+    if (index >= options.length) {
+      return;
+    }
+    slotSpiralImage.src = options[index];
+    index += 1;
+  };
+
+  slotSpiralImage.onerror = tryLoad;
+  tryLoad();
+}
+
+function startGameFromHome() {
+  playerName = sanitizePlayerName(playerNameInput ? playerNameInput.value : playerName);
+  if (playerNameInput) {
+    playerNameInput.value = playerName;
+  }
+
+  appPhase = "game";
+  setHomeScreenVisible(false);
+  resetGame();
+}
+
+function initializeHomeScreen() {
+  setHomeScreenVisible(true);
+  updateHomeHud();
+
+  if (playerNameInput) {
+    playerNameInput.value = playerName;
+    playerNameInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        startGameFromHome();
+        event.preventDefault();
+      }
+    });
+  }
+
+  if (gameSlotPlay) {
+    gameSlotPlay.addEventListener("click", startGameFromHome);
+  }
+
+  applyHomeSlotImage();
+}
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -501,7 +579,7 @@ function updateTokenTransfer() {
 
 function getWinnerLabel() {
   if (state.winnerType === "player") {
-    return "Player";
+    return playerName;
   }
 
   if (state.winnerType === "bot") {
@@ -517,7 +595,7 @@ function getHolderLabel(holder) {
   }
 
   if (holder.type === "player") {
-    return "Player";
+    return playerName;
   }
 
   return getBotDisplayName(holder.botId);
@@ -1066,6 +1144,10 @@ function updateCamera() {
 }
 
 function update() {
+  if (appPhase !== "game") {
+    return;
+  }
+
   if (state.mode === "playing") {
     updateBouncePads();
 
@@ -1325,6 +1407,13 @@ function drawPlayer() {
   ctx.fillStyle = "#173070";
   ctx.fillRect(player.x + 11, player.y + 15, 6, 6);
   ctx.fillRect(player.x + player.w - 17, player.y + 15, 6, 6);
+
+  ctx.fillStyle = "rgba(15, 22, 46, 0.78)";
+  ctx.fillRect(player.x - 10, player.y - 20, player.w + 20, 14);
+  ctx.fillStyle = "#f4f7ff";
+  ctx.font = '700 11px "Segoe UI", sans-serif';
+  ctx.textAlign = "center";
+  ctx.fillText(playerName, player.x + player.w * 0.5, player.y - 9);
 }
 
 function drawTextCenter(y, text, size = 36, color = "#f7f9ff") {
@@ -1335,6 +1424,10 @@ function drawTextCenter(y, text, size = 36, color = "#f7f9ff") {
 }
 
 function drawScreenTimer() {
+  if (appPhase !== "game") {
+    return;
+  }
+
   const rawSeconds = Math.ceil(state.roundFramesRemaining / 60);
   const secondsLeft = state.mode === "finished" ? 0 : Math.max(0, rawSeconds);
   const timerText = `${String(secondsLeft).padStart(2, "0")}s`;
@@ -1412,6 +1505,14 @@ function keyIsJump(key) {
 function keyDownHandler(event) {
   const key = event.key.toLowerCase();
 
+  if (appPhase !== "game") {
+    if (key === "enter") {
+      startGameFromHome();
+      event.preventDefault();
+    }
+    return;
+  }
+
   if (key === "a" || key === "arrowleft") {
     keys.left = true;
     event.preventDefault();
@@ -1434,6 +1535,10 @@ function keyDownHandler(event) {
 }
 
 function keyUpHandler(event) {
+  if (appPhase !== "game") {
+    return;
+  }
+
   const key = event.key.toLowerCase();
 
   if (key === "a" || key === "arrowleft") {
@@ -1454,5 +1559,5 @@ function gameLoop() {
 document.addEventListener("keydown", keyDownHandler);
 document.addEventListener("keyup", keyUpHandler);
 
-resetGame();
+initializeHomeScreen();
 requestAnimationFrame(gameLoop);

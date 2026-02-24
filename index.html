@@ -17,13 +17,43 @@
         <span id="hud-status">No score / no checkpoints</span>
       </section>
 
-      <canvas
-        id="game-canvas"
-        width="960"
-        height="540"
-        role="img"
-        aria-label="A vertical climbing platformer game canvas"
-      ></canvas>
+      <div class="game-stage">
+        <canvas
+          id="game-canvas"
+          width="960"
+          height="540"
+          role="img"
+          aria-label="A short endless arena platformer game canvas"
+        ></canvas>
+
+        <section id="home-screen" class="home-screen" aria-label="Home screen" aria-live="polite">
+          <h2 class="home-title">Home Screen</h2>
+          <p class="home-subtitle">Enter your name, then pick a game slot.</p>
+
+          <label class="name-bar" for="player-name-input">
+            <span>Your Name</span>
+            <input id="player-name-input" type="text" maxlength="16" placeholder="Player" autocomplete="off" />
+          </label>
+
+          <div class="slot-grid">
+            <button id="game-slot-play" class="game-slot active" type="button" aria-label="Play Arena Slot">
+              <img id="slot-spiral-image" src="./purple-spiral.png" alt="Purple spiral slot icon" />
+              <strong>Arena Slot</strong>
+              <span>Click to Play</span>
+            </button>
+
+            <button class="game-slot locked" type="button" disabled aria-label="Locked game slot">
+              <span class="locked-mark">Locked</span>
+              <strong>Slot 2</strong>
+            </button>
+
+            <button class="game-slot locked" type="button" disabled aria-label="Locked game slot">
+              <span class="locked-mark">Locked</span>
+              <strong>Slot 3</strong>
+            </button>
+          </div>
+        </section>
+      </div>
 
       <section class="controls">
         <strong>Controls:</strong>
