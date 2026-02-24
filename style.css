@@ -279,6 +279,11 @@ body {
   color: #fff7e4;
 }
 
+.place-card:disabled {
+  opacity: 0.95;
+  cursor: default;
+}
+
 @keyframes tape-spin {
   from {
     transform: translateX(0);

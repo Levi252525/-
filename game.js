@@ -171,52 +171,259 @@ let selectedThemeId = THEMES[0].id;
 let selectedPlaceId = PLACE_OPTIONS[0].id;
 let currentTheme = THEMES[0];
 
-function buildPlatforms() {
+function buildFloorPlatform() {
+  return {
+    x: WALL_THICKNESS,
+    y: WORLD.height - 32,
+    w: WORLD.width - WALL_THICKNESS * 2,
+    h: 32,
+  };
+}
+
+function makePowerUpOnPlatform(platform, type, yOffset = 44, size = 24, bobPhase = 0) {
+  return {
+    type,
+    x: platform.x + platform.w * 0.5 - size * 0.5,
+    y: platform.y - yOffset,
+    w: size,
+    h: size,
+    bobPhase,
+  };
+}
+
+function buildEdgePads(platformList, padWidth = 62, padHeight = 8) {
+  const floor = platformList[platformList.length - 1];
   return [
-    { x: WALL_THICKNESS + 75, y: WORLD.height - 128, w: 225, h: 18 },
-    { x: WORLD.width - WALL_THICKNESS - 300, y: WORLD.height - 128, w: 225, h: 18 },
-    { x: WORLD.width / 2 - 115, y: WORLD.height - 218, w: 230, h: 16 },
-    { x: WALL_THICKNESS + 170, y: WORLD.height - 315, w: 190, h: 16 },
-    { x: WORLD.width - WALL_THICKNESS - 360, y: WORLD.height - 315, w: 190, h: 16 },
-    {
-      x: WALL_THICKNESS,
-      y: WORLD.height - 32,
-      w: WORLD.width - WALL_THICKNESS * 2,
-      h: 32,
+    { x: floor.x, y: floor.y, w: padWidth, h: padHeight },
+    { x: floor.x + floor.w - padWidth, y: floor.y, w: padWidth, h: padHeight },
+  ];
+}
+
+const PLACE_PROFILES = {
+  "skyline-run": {
+    id: "skyline-run",
+    label: "Skyline Run",
+    featureText: "Balanced arena with edge launch pads",
+    buildPlatforms: () => [
+      { x: WALL_THICKNESS + 75, y: WORLD.height - 128, w: 225, h: 18 },
+      { x: WORLD.width - WALL_THICKNESS - 300, y: WORLD.height - 128, w: 225, h: 18 },
+      { x: WORLD.width / 2 - 115, y: WORLD.height - 218, w: 230, h: 16 },
+      { x: WALL_THICKNESS + 170, y: WORLD.height - 315, w: 190, h: 16 },
+      { x: WORLD.width - WALL_THICKNESS - 360, y: WORLD.height - 315, w: 190, h: 16 },
+      buildFloorPlatform(),
+    ],
+    buildBouncePads: (plats) => buildEdgePads(plats, 62, 8),
+    buildPowerUps: (plats) => [
+      makePowerUpOnPlatform(plats[3], "speed", 44, 24, 0),
+      makePowerUpOnPlatform(plats[4], "jump", 44, 24, Math.PI * 0.6),
+      makePowerUpOnPlatform(plats[2], "speed", 48, 24, Math.PI * 1.1),
+    ],
+    rules: {},
+  },
+  "neon-arc": {
+    id: "neon-arc",
+    label: "Neon Arc",
+    featureText: "Low gravity with a center launch pad",
+    buildPlatforms: () => [
+      { x: WALL_THICKNESS + 68, y: WORLD.height - 130, w: 220, h: 18 },
+      { x: WORLD.width - WALL_THICKNESS - 288, y: WORLD.height - 130, w: 220, h: 18 },
+      { x: WORLD.width / 2 - 120, y: WORLD.height - 210, w: 240, h: 16 },
+      { x: WALL_THICKNESS + 130, y: WORLD.height - 286, w: 170, h: 16 },
+      { x: WORLD.width - WALL_THICKNESS - 300, y: WORLD.height - 286, w: 170, h: 16 },
+      { x: WORLD.width / 2 - 98, y: WORLD.height - 372, w: 196, h: 16 },
+      buildFloorPlatform(),
+    ],
+    buildBouncePads: (plats) => {
+      const pads = buildEdgePads(plats, 60, 8);
+      const center = plats[2];
+      pads.push({ x: center.x + center.w * 0.5 - 42, y: center.y, w: 84, h: 8 });
+      return pads;
     },
-  ];
+    buildPowerUps: (plats) => [
+      makePowerUpOnPlatform(plats[5], "jump", 46, 24, 0.2),
+      makePowerUpOnPlatform(plats[3], "speed", 42, 24, 0.8),
+      makePowerUpOnPlatform(plats[4], "speed", 42, 24, 1.4),
+    ],
+    rules: {
+      gravityScale: 0.84,
+      padPlayerScale: 1.1,
+      padBotScale: 1.08,
+      powerDurationScale: 1.2,
+    },
+  },
+  "aurora-labs": {
+    id: "aurora-labs",
+    label: "Aurora Labs",
+    featureText: "Dense platforms with rapid power-up cycling",
+    buildPlatforms: () => [
+      { x: WALL_THICKNESS + 60, y: WORLD.height - 126, w: 180, h: 16 },
+      { x: WORLD.width - WALL_THICKNESS - 240, y: WORLD.height - 126, w: 180, h: 16 },
+      { x: WORLD.width / 2 - 80, y: WORLD.height - 194, w: 160, h: 14 },
+      { x: WALL_THICKNESS + 140, y: WORLD.height - 252, w: 130, h: 14 },
+      { x: WORLD.width - WALL_THICKNESS - 270, y: WORLD.height - 252, w: 130, h: 14 },
+      { x: WORLD.width / 2 - 70, y: WORLD.height - 316, w: 140, h: 14 },
+      { x: WALL_THICKNESS + 205, y: WORLD.height - 378, w: 120, h: 14 },
+      { x: WORLD.width - WALL_THICKNESS - 325, y: WORLD.height - 378, w: 120, h: 14 },
+      buildFloorPlatform(),
+    ],
+    buildBouncePads: (plats) => {
+      const pads = buildEdgePads(plats, 56, 8);
+      pads.push({ x: plats[5].x + plats[5].w * 0.5 - 38, y: plats[5].y, w: 76, h: 8 });
+      return pads;
+    },
+    buildPowerUps: (plats) => [
+      makePowerUpOnPlatform(plats[2], "jump", 44, 24, 0.1),
+      makePowerUpOnPlatform(plats[6], "speed", 40, 24, 0.8),
+      makePowerUpOnPlatform(plats[7], "speed", 40, 24, 1.4),
+      makePowerUpOnPlatform(plats[5], "jump", 40, 24, 2),
+    ],
+    rules: {
+      botAccelScale: 1.06,
+      powerDurationScale: 1.08,
+      powerRespawnScale: 0.62,
+    },
+  },
+  "forge-path": {
+    id: "forge-path",
+    label: "Forge Path",
+    featureText: "Heavy gravity and overcharged launch pads",
+    buildPlatforms: () => [
+      { x: WALL_THICKNESS + 40, y: WORLD.height - 116, w: 260, h: 18 },
+      { x: WORLD.width - WALL_THICKNESS - 300, y: WORLD.height - 116, w: 260, h: 18 },
+      { x: WORLD.width / 2 - 150, y: WORLD.height - 212, w: 300, h: 18 },
+      { x: WALL_THICKNESS + 130, y: WORLD.height - 300, w: 180, h: 16 },
+      { x: WORLD.width - WALL_THICKNESS - 310, y: WORLD.height - 300, w: 180, h: 16 },
+      { x: WORLD.width / 2 - 92, y: WORLD.height - 392, w: 184, h: 16 },
+      buildFloorPlatform(),
+    ],
+    buildBouncePads: (plats) => {
+      const floor = plats[plats.length - 1];
+      return [
+        { x: floor.x, y: floor.y, w: 56, h: 8 },
+        { x: floor.x + floor.w - 56, y: floor.y, w: 56, h: 8 },
+        { x: floor.x + floor.w * 0.5 - 60, y: floor.y, w: 120, h: 8 },
+      ];
+    },
+    buildPowerUps: (plats) => [
+      makePowerUpOnPlatform(plats[5], "jump", 44, 24, 0.2),
+      makePowerUpOnPlatform(plats[2], "speed", 52, 24, 0.9),
+      makePowerUpOnPlatform(plats[3], "speed", 42, 24, 1.6),
+      makePowerUpOnPlatform(plats[4], "jump", 42, 24, 2.3),
+    ],
+    rules: {
+      gravityScale: 1.2,
+      maxFallScale: 1.16,
+      playerAccelScale: 0.93,
+      padPlayerScale: 1.28,
+      padBotScale: 1.24,
+    },
+  },
+  "crystal-bay": {
+    id: "crystal-bay",
+    label: "Crystal Bay",
+    featureText: "Slippery movement and extended power boosts",
+    buildPlatforms: () => [
+      { x: WALL_THICKNESS + 70, y: WORLD.height - 134, w: 210, h: 16 },
+      { x: WORLD.width - WALL_THICKNESS - 280, y: WORLD.height - 134, w: 210, h: 16 },
+      { x: WORLD.width / 2 - 150, y: WORLD.height - 214, w: 300, h: 14 },
+      { x: WALL_THICKNESS + 120, y: WORLD.height - 292, w: 190, h: 14 },
+      { x: WORLD.width - WALL_THICKNESS - 310, y: WORLD.height - 292, w: 190, h: 14 },
+      { x: WORLD.width / 2 - 110, y: WORLD.height - 362, w: 220, h: 14 },
+      buildFloorPlatform(),
+    ],
+    buildBouncePads: (plats) => buildEdgePads(plats, 58, 8),
+    buildPowerUps: (plats) => [
+      makePowerUpOnPlatform(plats[2], "speed", 48, 24, 0.3),
+      makePowerUpOnPlatform(plats[5], "jump", 40, 24, 1),
+      makePowerUpOnPlatform(plats[3], "speed", 40, 24, 1.8),
+      makePowerUpOnPlatform(plats[4], "jump", 40, 24, 2.5),
+    ],
+    rules: {
+      playerFrictionOffset: 0.11,
+      botFrictionOffset: 0.08,
+      playerAccelScale: 1.04,
+      botAccelScale: 1.06,
+      powerDurationScale: 1.24,
+      powerRespawnScale: 0.88,
+    },
+  },
+};
+
+const DEFAULT_PLACE_RULES = {
+  gravityScale: 1,
+  maxFallScale: 1,
+  playerAccelScale: 1,
+  botAccelScale: 1,
+  playerFrictionOffset: 0,
+  botFrictionOffset: 0,
+  playerSpeedBonus: 0,
+  botSpeedBonus: 0,
+  padPlayerScale: 1,
+  padBotScale: 1,
+  powerDurationScale: 1,
+  powerRespawnScale: 1,
+};
+
+function getPlaceProfile(placeId) {
+  return PLACE_PROFILES[placeId] || PLACE_PROFILES["skyline-run"];
 }
 
-const platforms = buildPlatforms();
+function clonePlatformsForProfile(platformList) {
+  return platformList.map((platform) => ({ ...platform }));
+}
+
+function cloneBouncePadsForProfile(pads) {
+  return pads.map((pad, index) => ({ id: index, ...pad, flashFrames: 0 }));
+}
+
+function clonePowerUpsForProfile(powerUpList) {
+  return powerUpList.map((powerUp, index) => ({
+    id: index,
+    ...powerUp,
+    active: true,
+    respawnFrames: 0,
+    bobPhase: typeof powerUp.bobPhase === "number" ? powerUp.bobPhase : index * 0.8,
+  }));
+}
+
+function chooseRandomPlaceId() {
+  const randomIndex = Math.floor(Math.random() * PLACE_OPTIONS.length);
+  return PLACE_OPTIONS[randomIndex].id;
+}
+
+let currentPlaceProfile = getPlaceProfile(selectedPlaceId);
+let currentPlaceRules = { ...DEFAULT_PLACE_RULES, ...(currentPlaceProfile.rules || {}) };
+let platforms = clonePlatformsForProfile(currentPlaceProfile.buildPlatforms());
+let bouncePads = cloneBouncePadsForProfile(currentPlaceProfile.buildBouncePads(platforms));
+let powerUps = clonePowerUpsForProfile(currentPlaceProfile.buildPowerUps(platforms));
 const hazards = [];
-
-function buildBouncePads() {
-  const padWidth = 62;
-  const padHeight = 8;
-  const floor = platforms[platforms.length - 1];
-
-  return [
-    { id: 0, x: floor.x, y: floor.y, w: padWidth, h: padHeight, flashFrames: 0 },
-    { id: 1, x: floor.x + floor.w - padWidth, y: floor.y, w: padWidth, h: padHeight, flashFrames: 0 },
-  ];
-}
-
-function buildPowerUps() {
-  const size = 24;
-  return [
-    { id: 0, type: "speed", x: platforms[3].x + platforms[3].w * 0.5 - size * 0.5, y: platforms[3].y - 44, w: size, h: size, active: true, respawnFrames: 0, bobPhase: 0 },
-    { id: 1, type: "jump", x: platforms[4].x + platforms[4].w * 0.5 - size * 0.5, y: platforms[4].y - 44, w: size, h: size, active: true, respawnFrames: 0, bobPhase: Math.PI * 0.6 },
-    { id: 2, type: "speed", x: platforms[2].x + platforms[2].w * 0.5 - size * 0.5, y: platforms[2].y - 48, w: size, h: size, active: true, respawnFrames: 0, bobPhase: Math.PI * 1.1 },
-  ];
-}
-
-const bouncePads = buildBouncePads();
-const powerUps = buildPowerUps();
 
 const playerSpawn = {
   x: platforms[0].x + platforms[0].w / 2 - PLAYER_WIDTH / 2,
   y: platforms[0].y - 50,
 };
+
+function rebuildArenaForPlace(placeId) {
+  const profile = getPlaceProfile(placeId);
+  selectedPlaceId = profile.id;
+  currentPlaceProfile = profile;
+  currentPlaceRules = { ...DEFAULT_PLACE_RULES, ...(profile.rules || {}) };
+  platforms = clonePlatformsForProfile(profile.buildPlatforms());
+  bouncePads = cloneBouncePadsForProfile(profile.buildBouncePads(platforms));
+  powerUps = clonePowerUpsForProfile(profile.buildPowerUps(platforms));
+
+  const spawnPlatform = platforms[0] || platforms[platforms.length - 1];
+  playerSpawn.x = spawnPlatform.x + spawnPlatform.w / 2 - PLAYER_WIDTH / 2;
+  playerSpawn.y = spawnPlatform.y - 50;
+
+  if (typeof player !== "undefined") {
+    player.spawnX = playerSpawn.x;
+    player.spawnY = playerSpawn.y;
+  }
+
+  updateSelectedPlaceLabel();
+  refreshPlaceTapeSelection();
+}
 
 const player = {
   x: playerSpawn.x,
@@ -403,7 +610,7 @@ function setHomeScreenVisible(visible) {
 }
 
 function updateHomeHud() {
-  hudStatus.textContent = "Enter your name, pick character/theme/place, then click the spiral slot";
+  hudStatus.textContent = "Enter your name, pick character/theme, then start - place is random every run";
 }
 
 function applyHomeSlotImage() {
@@ -477,11 +684,8 @@ function renderPlaceTape() {
     card.className = "place-card";
     card.dataset.placeId = place.id;
     card.textContent = place.label;
-    card.addEventListener("click", () => {
-      selectedPlaceId = place.id;
-      updateSelectedPlaceLabel();
-      refreshPlaceTapeSelection();
-    });
+    card.disabled = true;
+    card.title = "Random place each run";
     placeTapeTrack.appendChild(card);
   }
 
@@ -586,8 +790,22 @@ function randomRangeInt(min, max) {
   return min + Math.floor(Math.random() * (max - min + 1));
 }
 
+function getCurrentGravity() {
+  return GRAVITY * currentPlaceRules.gravityScale;
+}
+
+function getCurrentMaxFallSpeed() {
+  return MAX_FALL_SPEED * currentPlaceRules.maxFallScale;
+}
+
+function getCurrentPadStrength(forBot) {
+  return (forBot ? BOUNCE_PAD_BOT_STRENGTH : BOUNCE_PAD_PLAYER_STRENGTH) *
+    (forBot ? currentPlaceRules.padBotScale : currentPlaceRules.padPlayerScale);
+}
+
 function getEntityMaxSpeed(entity) {
-  return entity.maxSpeed + (entity.speedBoostFrames > 0 ? 2.35 : 0);
+  const placeBonus = entity === player ? currentPlaceRules.playerSpeedBonus : currentPlaceRules.botSpeedBonus;
+  return entity.maxSpeed + (entity.speedBoostFrames > 0 ? 2.35 : 0) + placeBonus;
 }
 
 function getEntityJumpStrength(entity) {
@@ -613,13 +831,15 @@ function getPowerUpY(powerUp) {
 }
 
 function applyPowerUp(entity, type) {
+  const durationFrames = Math.max(120, Math.round(POWER_UP_DURATION_FRAMES * currentPlaceRules.powerDurationScale));
+
   if (type === "speed") {
-    entity.speedBoostFrames = POWER_UP_DURATION_FRAMES;
+    entity.speedBoostFrames = durationFrames;
     return;
   }
 
   if (type === "jump") {
-    entity.jumpBoostFrames = POWER_UP_DURATION_FRAMES;
+    entity.jumpBoostFrames = durationFrames;
   }
 }
 
@@ -663,7 +883,8 @@ function updatePowerUps() {
 
       applyPowerUp(participant.entity, powerUp.type);
       powerUp.active = false;
-      powerUp.respawnFrames = randomRangeInt(POWER_UP_RESPAWN_MIN_FRAMES, POWER_UP_RESPAWN_MAX_FRAMES);
+      const baseRespawn = randomRangeInt(POWER_UP_RESPAWN_MIN_FRAMES, POWER_UP_RESPAWN_MAX_FRAMES);
+      powerUp.respawnFrames = Math.max(90, Math.round(baseRespawn * currentPlaceRules.powerRespawnScale));
       break;
     }
   }
@@ -981,6 +1202,7 @@ function emitPlayerJumpSignal(jumpVelocity) {
 }
 
 function resetGame() {
+  rebuildArenaForPlace(chooseRandomPlaceId());
   state.mode = "playing";
   state.roundFramesRemaining = ROUND_DURATION_FRAMES;
   state.eliminationFramesRemaining = 0;
@@ -1051,8 +1273,8 @@ function keepInsideWalls(entity) {
 function updatePlayer() {
   updateEntityPowerTimers(player);
 
-  const acceleration = 0.72;
-  const friction = 0.82;
+  const acceleration = 0.72 * currentPlaceRules.playerAccelScale;
+  const friction = clamp(0.82 + currentPlaceRules.playerFrictionOffset, 0.72, 0.97);
   const effectiveMaxSpeed = getEntityMaxSpeed(player);
   const effectiveJumpStrength = getEntityJumpStrength(player);
 
@@ -1081,7 +1303,7 @@ function updatePlayer() {
   }
   jumpRequested = false;
 
-  player.vy = Math.min(player.vy + GRAVITY, MAX_FALL_SPEED);
+  player.vy = Math.min(player.vy + getCurrentGravity(), getCurrentMaxFallSpeed());
 
   player.x += player.vx;
   resolveHorizontalCollisions(player, platforms);
@@ -1089,7 +1311,7 @@ function updatePlayer() {
 
   player.y += player.vy;
   resolveVerticalCollisions(player, platforms);
-  tryBounceFromPads(player, BOUNCE_PAD_PLAYER_STRENGTH);
+  tryBounceFromPads(player, getCurrentPadStrength(false));
 
   if (player.y < 0) {
     player.y = 0;
@@ -1097,7 +1319,8 @@ function updatePlayer() {
   }
 
   if (player.y > WORLD.height + 120) {
-    player.y = WORLD.height - 32 - player.h;
+    const floor = platforms[platforms.length - 1];
+    player.y = floor.y - player.h;
     player.vy = 0;
     player.onGround = true;
     player.jumpsUsed = 0;
@@ -1230,8 +1453,10 @@ function updateSingleBot(bot) {
     targetX = target.aimX * 0.62 + predictedFocusX * 0.38;
   }
 
-  const acceleration = behavior.mode === "chase" ? BOT_DIFFICULTY.chaseAcceleration : BOT_DIFFICULTY.fleeAcceleration;
-  const friction = 0.9;
+  const acceleration =
+    (behavior.mode === "chase" ? BOT_DIFFICULTY.chaseAcceleration : BOT_DIFFICULTY.fleeAcceleration) *
+    currentPlaceRules.botAccelScale;
+  const friction = clamp(0.9 + currentPlaceRules.botFrictionOffset, 0.78, 0.98);
 
   let intentX = Math.sign(targetX - botCenterX);
   if (Math.abs(targetX - botCenterX) < 3) {
@@ -1324,7 +1549,7 @@ function updateSingleBot(bot) {
     }
   }
 
-  bot.vy = Math.min(bot.vy + GRAVITY, MAX_FALL_SPEED);
+  bot.vy = Math.min(bot.vy + getCurrentGravity(), getCurrentMaxFallSpeed());
 
   bot.x += bot.vx;
   resolveHorizontalCollisions(bot, platforms);
@@ -1332,7 +1557,7 @@ function updateSingleBot(bot) {
 
   bot.y += bot.vy;
   resolveVerticalCollisions(bot, platforms);
-  tryBounceFromPads(bot, BOUNCE_PAD_BOT_STRENGTH);
+  tryBounceFromPads(bot, getCurrentPadStrength(true));
 
   if (bot.y < 0) {
     bot.y = 0;
@@ -1713,7 +1938,7 @@ function drawIntroHint() {
   ctx.fillStyle = `rgba(247, 251, 255, ${alpha})`;
   ctx.font = '600 20px "Segoe UI", sans-serif';
   ctx.textAlign = "center";
-  ctx.fillText(`${getSelectedPlace().label}: holder chases, others flee`, canvas.width / 2, 48);
+  ctx.fillText(`${getSelectedPlace().label}: ${currentPlaceProfile.featureText}`, canvas.width / 2, 48);
 }
 
 function draw() {
